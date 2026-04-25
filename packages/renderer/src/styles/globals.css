@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+:root {
+  --drawer-width: 480px;
+  --color-accent: #3b82f6;
+  --color-bg: #0a0a0a;
+  --color-surface: #171717;
+  --color-surface-elevated: #262626;
+  --color-border: rgba(255, 255, 255, 0.08);
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: #fafafa;
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}

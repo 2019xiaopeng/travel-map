@@ -1,0 +1,16 @@
+{
+  "name": "travel-map",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @travel-map/renderer dev",
+    "dev:electron": "pnpm --filter @travel-map/app dev",
+    "build": "pnpm --filter @travel-map/renderer build && pnpm --filter @travel-map/app build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

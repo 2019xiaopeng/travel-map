@@ -1,0 +1,12 @@
+travel-map/
+├── pnpm-workspace.yaml
+├── package.json
+├── .gitignore
+├── .env.example
+├── .env.local              # 你本机的 key（gitignore）
+├── docs/
+│   └── travel-map-docs/    # 把我们这套文档复制进来
+└── packages/
+    ├── app/                # Electron main + preload（负责SQLite、文件、R2）
+    ├── renderer/           # Vite + React（UI：地图、抽屉、Milkdown）
+    └── core/               # 纯业务逻辑/类型（可选，但建议保留）

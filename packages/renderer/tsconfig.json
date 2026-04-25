@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@travel-map/core": ["../core/src"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../core" }
+  ]
+}
