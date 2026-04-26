@@ -23,10 +23,14 @@ const HOVER_STYLE = {
 
 export function ProvinceLayer({ map }: { map: any }) {
   const polygonsRef = useRef<any[]>([]);
+  const tooltipRef = useRef<any>(null);
   const enterProvince = useMapStore((s) => s.enterProvince);
 
   const handleClick = useCallback(
     (feature: GeoFeature) => {
+      if (tooltipRef.current) {
+        tooltipRef.current.hide();
+      }
       const { id, name, center } = feature.properties;
       enterProvince(id, name);
 
@@ -40,11 +44,32 @@ export function ProvinceLayer({ map }: { map: any }) {
     if (!map) return;
 
     let cancelled = false;
+    const AMap = window.AMap;
+
+    if (!tooltipRef.current) {
+      tooltipRef.current = new AMap.Text({
+        text: "",
+        anchor: "bottom-center",
+        offset: new AMap.Pixel(0, -10),
+        style: {
+          "background-color": "rgba(0, 0, 0, 0.75)",
+          "color": "#fff",
+          "border": "none",
+          "border-radius": "4px",
+          "padding": "4px 8px",
+          "font-size": "12px",
+          "box-shadow": "0 2px 6px rgba(0,0,0,0.3)",
+          "pointer-events": "none",
+        },
+        visible: false,
+        zIndex: 100,
+      });
+      tooltipRef.current.setMap(map);
+    }
 
     loadGeoJson("china-provinces.json").then((geo) => {
       if (cancelled) return;
 
-      const AMap = window.AMap;
       const polygons = geo.features.map((feature) => {
         const paths =
           feature.geometry.type === "Polygon"
@@ -58,8 +83,25 @@ export function ProvinceLayer({ map }: { map: any }) {
         });
 
         polygon.on("click", () => handleClick(feature));
-        polygon.on("mouseover", () => polygon.setOptions(HOVER_STYLE));
-        polygon.on("mouseout", () => polygon.setOptions(NORMAL_STYLE));
+        polygon.on("mouseover", (e: any) => {
+          polygon.setOptions(HOVER_STYLE);
+          if (tooltipRef.current) {
+            tooltipRef.current.setText(feature.properties.name);
+            tooltipRef.current.setPosition(e.lnglat);
+            tooltipRef.current.show();
+          }
+        });
+        polygon.on("mousemove", (e: any) => {
+          if (tooltipRef.current) {
+            tooltipRef.current.setPosition(e.lnglat);
+          }
+        });
+        polygon.on("mouseout", () => {
+          polygon.setOptions(NORMAL_STYLE);
+          if (tooltipRef.current) {
+            tooltipRef.current.hide();
+          }
+        });
 
         return polygon;
       });
@@ -74,10 +116,15 @@ export function ProvinceLayer({ map }: { map: any }) {
       polygonsRef.current.forEach((p) => {
         p.off("click");
         p.off("mouseover");
+        p.off("mousemove");
         p.off("mouseout");
         p.setMap(null);
       });
       polygonsRef.current = [];
+      if (tooltipRef.current) {
+        tooltipRef.current.setMap(null);
+        tooltipRef.current = null;
+      }
     };
   }, [map, handleClick]);
 

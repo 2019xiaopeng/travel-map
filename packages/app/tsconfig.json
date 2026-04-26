@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "./out",
     "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
     "paths": {
       "@/*": ["./src/*"]
     }

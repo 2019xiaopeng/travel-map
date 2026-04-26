@@ -1,6 +1,8 @@
 import { app, shell, BrowserWindow } from "electron";
 import { join } from "path";
 import { is } from "@electron-toolkit/utils";
+import { initDb } from "./db";
+import { setupIpc } from "./ipc";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -33,6 +35,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  initDb();
+  setupIpc();
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

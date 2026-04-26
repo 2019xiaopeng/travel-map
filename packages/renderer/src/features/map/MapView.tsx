@@ -3,6 +3,7 @@ import { loadAmapSdk } from "./loadAmapSdk";
 import { useMapStore } from "./mapStore";
 import { ProvinceLayer } from "./layers/ProvinceLayer";
 import { CityLayer } from "./layers/CityLayer";
+import { PoiLayer } from "./layers/PoiLayer";
 import { BreadCrumbOverlay } from "./BreadCrumbOverlay";
 
 export function MapView() {
@@ -12,6 +13,7 @@ export function MapView() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const level = useMapStore((s) => s.level);
   const provinceId = useMapStore((s) => s.provinceId);
+  const cityId = useMapStore((s) => s.cityId);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -80,6 +82,10 @@ export function MapView() {
 
       {(level === "province" || level === "city") && map && provinceId && (
         <CityLayer map={map} provinceId={provinceId} />
+      )}
+
+      {level === "city" && map && cityId && (
+        <PoiLayer map={map} cityId={cityId} />
       )}
 
       <BreadCrumbOverlay />
