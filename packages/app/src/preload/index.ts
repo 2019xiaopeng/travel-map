@@ -7,6 +7,10 @@ const api = {
     query: (sql: string, params?: any[]) => ipcRenderer.invoke('db:query', sql, params),
     get: (sql: string, params?: any[]) => ipcRenderer.invoke('db:get', sql, params),
     run: (sql: string, params?: any[]) => ipcRenderer.invoke('db:run', sql, params),
+  },
+  file: {
+    select: () => ipcRenderer.invoke('file:select'),
+    saveAsset: (sourcePath: string, destRelativeDir: string) => ipcRenderer.invoke('file:saveAsset', sourcePath, destRelativeDir),
   }
 };
 

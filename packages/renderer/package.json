@@ -10,19 +10,33 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@milkdown/core": "^7.20.0",
+    "@milkdown/ctx": "^7.20.0",
+    "@milkdown/plugin-clipboard": "^7.20.0",
+    "@milkdown/plugin-history": "^7.20.0",
+    "@milkdown/plugin-listener": "^7.20.0",
+    "@milkdown/preset-commonmark": "^7.20.0",
+    "@milkdown/react": "^7.20.0",
+    "@milkdown/theme-nord": "^7.20.0",
+    "@types/markdown-it": "^14.1.2",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.500.0",
+    "markdown-it": "^14.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zustand": "^5.0.0",
-    "clsx": "^2.1.0",
-    "lucide-react": "^0.500.0"
+    "react-markdown": "^10.1.0",
+    "react-markdown-editor-lite": "^1.4.2",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.0",
     "tailwindcss": "^4.1.0",
-    "@tailwindcss/vite": "^4.1.0",
-    "vite": "^6.3.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vite": "^6.3.0"
   }
 }

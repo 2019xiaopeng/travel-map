@@ -8,5 +8,9 @@ interface Window {
       get: (sql: string, params?: any[]) => Promise<any>;
       run: (sql: string, params?: any[]) => Promise<any>;
     };
+    file: {
+      select: () => Promise<string | null>;
+      saveAsset: (sourcePath: string, destRelativeDir: string) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
+    };
   };
 }

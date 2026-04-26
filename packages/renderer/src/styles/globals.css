@@ -16,3 +16,35 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
 }
+
+/* 隐藏地图的高德 Logo 和 Copyright */
+.amap-logo,
+.amap-copyright {
+  display: none !important;
+}
+
+/* MdEditor Custom Theme */
+.custom-md-editor .rc-md-editor {
+  background-color: var(--color-surface) !important;
+  color: #e5e5e5 !important;
+  border-radius: 0 !important;
+}
+.custom-md-editor .rc-md-editor .rc-md-navigation {
+  background-color: var(--color-surface-elevated) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+}
+.custom-md-editor .rc-md-editor .editor-container .sec-md .input {
+  background-color: var(--color-surface) !important;
+  color: #e5e5e5 !important;
+}
+.custom-md-editor .rc-md-editor .editor-container .sec-html {
+  background-color: var(--color-surface) !important;
+  color: #e5e5e5 !important;
+  border-left: 1px solid var(--color-border) !important;
+}
+.custom-md-editor .rc-md-editor .button-wrap {
+  color: #a1a1aa !important;
+}
+.custom-md-editor .rc-md-editor .button-wrap:hover {
+  color: #fff !important;
+}

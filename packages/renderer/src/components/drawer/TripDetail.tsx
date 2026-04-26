@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { db } from "../../services/db";
+import MdEditor from 'react-markdown-editor-lite';
+import MarkdownIt from 'markdown-it';
+import 'react-markdown-editor-lite/lib/index.css';
+import { useMapStore } from "../../features/map/mapStore";
+
+const mdParser = new MarkdownIt();
 
 interface TripDetailProps {
   tripId: string;
@@ -9,6 +15,8 @@ interface TripDetailProps {
 export function TripDetail({ tripId, onBack }: TripDetailProps) {
   const [trip, setTrip] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"content" | "attachment">("content");
+  const cityId = useMapStore((s) => s.cityId);
+  const cityName = useMapStore((s) => s.cityName);
 
   useEffect(() => {
     db.getTrip(tripId).then(setTrip);
@@ -20,6 +28,29 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
     const updated = { ...trip, [field]: value };
     setTrip(updated);
     db.updateTrip(updated);
+  };
+
+  const handleImageUpload = async (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      // 真实场景：把 File 转换为本地路径然后上传
+      // 因为这里我们是在 renderer 里面拿到的 file 对象，其实在 Electron 里有 file.path
+      const path = (file as any).path;
+      if (path && cityId && cityName) {
+        // 使用 IPC 上传
+        const tripDir = `${trip.date_start}_${trip.date_end}-${trip.title}`.replace(/[\/\\]/g, '-');
+        const destDir = `cities/${cityId}-${cityName}/trips/${tripDir}/photos`;
+        
+        window.travelMap.file.saveAsset(path, destDir).then(res => {
+          if (res.localUrl) {
+            resolve(res.localUrl);
+          } else {
+            resolve(URL.createObjectURL(file)); // fallback
+          }
+        });
+      } else {
+        resolve(URL.createObjectURL(file));
+      }
+    });
   };
 
   return (
@@ -79,22 +110,28 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
             <TabButton active={activeTab === "attachment"} onClick={() => setActiveTab("attachment")}>附件</TabButton>
           </div>
 
-          <div className="flex-1 p-4 overflow-y-auto">
+          <div className="flex-1 p-0 overflow-y-auto custom-md-editor">
             {activeTab === "content" && (
-              <textarea
-                className="
-                  w-full h-full min-h-[300px] resize-none rounded-lg border border-dashed border-[var(--color-border)]
-                  bg-[var(--color-surface-elevated)]/30 p-4
-                  text-sm text-neutral-300 outline-none focus:border-[var(--color-accent)]
-                "
-                placeholder="在此编辑旅行正文 (支持 Markdown)..."
+              <MdEditor
                 value={trip.content || ""}
-                onChange={(e) => handleChange("content", e.target.value)}
+                style={{ height: '100%', border: 'none' }}
+                renderHTML={text => mdParser.render(text)}
+                onChange={({ text }) => handleChange("content", text)}
+                onImageUpload={handleImageUpload}
+                config={{
+                  view: {
+                    menu: true,
+                    md: true,
+                    html: true
+                  }
+                }}
               />
             )}
             {activeTab === "attachment" && (
-              <div className="text-sm text-neutral-500 flex items-center justify-center h-full border border-dashed border-[var(--color-border)] rounded-lg">
-                附件功能开发中...
+              <div className="p-4 h-full">
+                <div className="text-sm text-neutral-500 flex items-center justify-center h-full border border-dashed border-[var(--color-border)] rounded-lg">
+                  附件功能开发中...
+                </div>
               </div>
             )}
           </div>
