@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init *)"
+      "Bash(git init *)",
+      "Skill(planning-with-files)",
+      "Bash(pnpm --filter @travel-map/renderer build)"
     ]
   }
 }
