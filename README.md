@@ -71,6 +71,18 @@ pnpm --filter @travel-map/app build:win
 
 产物默认输出到 `packages/app/dist/`。
 
+## 验证路径（手动点按）
+
+1. 启动 `pnpm dev:electron`
+2. 在地图上点击任一省份边界进入省视图
+3. 点击地级市边界进入市视图，右侧抽屉打开
+4. 进入“旅行记录” → 新建一条 Trip → 在正文写内容/插入图片
+5. 在地图右键添加 POI → 点击 POI 打开详情 → 编辑类别/标签
+6. 在 Trip 详情页：
+   - 相关地点：查看行程 POI 顺序
+   - 记账明细：新增/删除一笔花费并确认总花费同步
+   - 附件：上传任意文件，确认在 `userData/assets/` 下落盘
+
 ## 数据存储与备份
 
 应用数据存储在操作系统的 `userData` 目录中（Electron `app.getPath('userData')`），其中包含：
@@ -87,6 +99,19 @@ pnpm --filter @travel-map/app build:win
 - DB 操作不透传 SQL，采用白名单 IPC API
 - 附件落盘路径做了规范化与目录约束，防止路径穿越写入
 - `local://` 协议对本地路径做前缀校验，防止越权读取
+
+## 常见问题
+
+- 地图提示 `VITE_AMAP_KEY is not set`：确认 `.env.local` 存在且变量名为 `VITE_AMAP_KEY`
+- 地图加载失败：检查 Key 是否开通 Web JS API、是否配置了 `VITE_AMAP_SECURITY_JS_CODE`
+- 打包后启动报 native 模块问题：优先使用 `pnpm --filter @travel-map/app build:*` 生成安装包，并确保 `electron-builder` 配置里包含 `better_sqlite3.node`
+
+## Roadmap
+
+- 旅行与 POI 的更强关联（在 Trip 中编辑 POI 顺序、路线规划）
+- 附件面板：列表化展示、快速打开、预览（图片/PDF）
+- 导入导出：一键打包 `userData` 目录、迁移到新设备
+- 可选云同步（后续阶段）
 
 ## 文档
 
