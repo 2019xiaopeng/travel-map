@@ -29,6 +29,8 @@ const api = {
       ipcRenderer.invoke("db:deleteTripCost", payload),
 
     getTripAttachments: (payload: { tripId: string }) => ipcRenderer.invoke("db:getTripAttachments", payload),
+    updateCitySummary: (payload: any) => ipcRenderer.invoke("db:updateCitySummary", payload),
+    updateCityCover: (payload: any) => ipcRenderer.invoke("db:updateCityCover", payload),
 
     getTags: (payload: { entityType: string; entityId: string }) => ipcRenderer.invoke("db:getTags", payload),
     addTag: (payload: { entityType: string; entityId: string; name: string }) => ipcRenderer.invoke("db:addTag", payload),

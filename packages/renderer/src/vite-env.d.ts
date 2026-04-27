@@ -24,7 +24,8 @@ interface Window {
       updateTripCost: (payload: { tripId: string; category: string; amount: number }) => Promise<number>;
       deleteTripCost: (payload: { tripId: string; category: string }) => Promise<number>;
       getTripAttachments: (payload: { tripId: string }) => Promise<any>;
-
+      updateCitySummary: (payload: { cityId: string; summary: string }) => Promise<void>;
+      updateCityCover: (payload: { cityId: string; assetId: string }) => Promise<void>;
       getTags: (payload: { entityType: string; entityId: string }) => Promise<Array<{ name: string }>>;
       addTag: (payload: { entityType: string; entityId: string; name: string }) => Promise<any>;
       removeTag: (payload: { entityType: string; entityId: string; name: string }) => Promise<any>;

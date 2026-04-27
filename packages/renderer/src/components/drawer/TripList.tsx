@@ -36,33 +36,30 @@ export function TripList({ cityId, onSelectTrip }: TripListProps) {
       </div>
 
       {trips.length === 0 ? (
-        <div className="text-sm text-neutral-500 py-10 text-center">
-          暂无旅行记录
+        <div className="text-sm text-neutral-500 flex flex-col items-center justify-center h-32 border border-dashed border-[var(--color-border)] rounded-lg">
+          <span className="mb-2 text-2xl">🌍</span>
+          <span>暂无旅行记录，点击右上角新建</span>
         </div>
       ) : (
-        <div className="space-y-2">
+        <ul className="space-y-3">
           {trips.map((trip) => (
-            <button
+            <li
               key={trip.trip_id}
               onClick={() => onSelectTrip(trip.trip_id)}
-              className="
-                w-full rounded-lg border border-[var(--color-border)]
-                bg-[var(--color-surface-elevated)]/40 p-4 text-left
-                transition-colors hover:border-[var(--color-accent)]/40 hover:bg-[var(--color-surface-elevated)]
-              "
+              className="group cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 transition-colors hover:border-[var(--color-accent)]"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-white">{trip.title}</span>
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">
-                  {trip.date_end ? "已完成" : "计划中"}
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-medium text-white group-hover:text-[var(--color-accent)] transition-colors">{trip.title}</h4>
+                <span className="text-[10px] text-neutral-500 bg-[var(--color-surface)] px-1.5 py-0.5 rounded">
+                  {trip.date_start}
                 </span>
               </div>
-              <div className="mt-1 text-xs text-neutral-500">
-                {trip.date_start} {trip.date_end && `~ ${trip.date_end}`}
+              <div className="text-xs text-neutral-400 line-clamp-2 leading-relaxed">
+                {trip.content?.replace(/<[^>]*>?/gm, '') || "暂无正文..."}
               </div>
-            </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

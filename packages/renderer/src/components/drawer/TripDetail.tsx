@@ -18,6 +18,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
   const [costs, setCosts] = useState<any[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [pois, setPois] = useState<any[]>([]);
+  const [attachments, setAttachments] = useState<any[]>([]);
   const cityId = useMapStore((s) => s.cityId);
   const cityName = useMapStore((s) => s.cityName);
 
@@ -28,15 +29,17 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
         const t = await db.getTrip(tripId);
         if (cancelled) return;
         setTrip(t);
-        const [nextCosts, nextTags, nextPois] = await Promise.all([
+        const [nextCosts, nextTags, nextPois, nextAttachments] = await Promise.all([
           db.getTripCosts(tripId),
           db.getTags("trip", tripId),
           db.getPoisForTrip(tripId),
+          db.getTripAttachments(tripId)
         ]);
         if (cancelled) return;
         setCosts(nextCosts);
         setTags(nextTags);
         setPois(nextPois);
+        setAttachments(nextAttachments);
       } catch {
         if (!cancelled) setTrip(null);
       }
@@ -346,6 +349,8 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                             }
                           }
                         }
+                        const nextAttachments = await db.getTripAttachments(tripId);
+                        setAttachments(nextAttachments);
                         alert("附件上传完成");
                       };
                       input.click();
@@ -355,10 +360,43 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                     + 上传附件
                   </button>
                 </div>
-                <div className="text-sm text-neutral-500 flex flex-col items-center justify-center h-32 border border-dashed border-[var(--color-border)] rounded-lg">
-                  <span className="mb-2 text-2xl">📁</span>
-                  <span>暂无附件（可在本地文件夹中查看）</span>
-                </div>
+                {attachments.length > 0 ? (
+                  <ul className="space-y-2">
+                    {attachments.map((a: any) => (
+                      <li key={a.asset_id} className="flex items-center justify-between text-xs bg-[var(--color-surface-elevated)] p-2 rounded border border-[var(--color-border)] group">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <span className="text-lg shrink-0">📄</span>
+                          <span className="text-white truncate" title={a.local_path}>{a.local_path.split('/').pop()}</span>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => window.open(`local:///${a.local_path}`)}
+                            className="text-[var(--color-accent)] hover:text-blue-400 px-2"
+                          >
+                            打开
+                          </button>
+                          <button 
+                            onClick={async () => {
+                              if (confirm("删除此附件记录？(仅删除关联，不删本地文件)")) {
+                                await db.removeTag("trip_attachment", tripId, a.asset_id);
+                                const nextAttachments = await db.getTripAttachments(tripId);
+                                setAttachments(nextAttachments);
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-400"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-neutral-500 flex flex-col items-center justify-center h-32 border border-dashed border-[var(--color-border)] rounded-lg">
+                    <span className="mb-2 text-2xl">📁</span>
+                    <span>暂无附件（可在本地文件夹中查看）</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

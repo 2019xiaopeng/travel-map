@@ -160,6 +160,20 @@ export function setupIpc() {
     `).all(payload.tripId);
   });
 
+  ipcMain.handle("db:updateCitySummary", (event, payload: { cityId: string; summary: string }) => {
+    assertSender(event);
+    const db = getDb();
+    db.prepare(`UPDATE City SET summary = ? WHERE city_id = ?`).run(payload.summary, payload.cityId);
+    return { ok: true };
+  });
+
+  ipcMain.handle("db:updateCityCover", (event, payload: { cityId: string; assetId: string }) => {
+    assertSender(event);
+    const db = getDb();
+    db.prepare(`UPDATE City SET cover_asset_id = ? WHERE city_id = ?`).run(payload.assetId, payload.cityId);
+    return { ok: true };
+  });
+
   ipcMain.handle("db:getPois", (event, payload: { cityId: string }) => {
     assertSender(event);
     const db = getDb();
