@@ -93,8 +93,8 @@
 可能会需要的配置（示例）：
 
 ```env
-# 高德 Key（示例，实际字段名待定）
-AMAP_KEY=your_amap_key
+VITE_AMAP_KEY=your_amap_key
+VITE_AMAP_SECURITY_JS_CODE=your_security_js_code
 ```
 
 ---
@@ -114,4 +114,3 @@ AMAP_KEY=your_amap_key
 ## 📄 License
 
 个人项目（暂未指定 License）。
-

@@ -2,6 +2,15 @@ import { useEffect, useRef } from "react";
 import { db } from "../../../services/db";
 import { useMapStore } from "../mapStore";
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
@@ -34,6 +43,7 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
         // Check if poi is in trip
         const tripIndex = tripPois.findIndex((tp: any) => tp.poi_id === poi.poi_id);
         const inTrip = tripIndex !== -1;
+        const safeName = escapeHtml(poi.name);
         const tripBadge = inTrip 
           ? `<div class="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-accent)] text-[10px] font-bold text-white shadow-sm border border-white z-10">${tripIndex + 1}</div>` 
           : '';
@@ -45,7 +55,7 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
               <span class="text-sm">${emoji}</span>
             </div>
             <div class="mt-1 hidden whitespace-nowrap rounded bg-[var(--color-surface)]/90 px-2 py-0.5 text-[10px] text-white shadow-lg backdrop-blur-sm group-hover:block z-20 absolute top-8">
-              ${poi.name}
+              ${safeName}
             </div>
           </div>
         `;

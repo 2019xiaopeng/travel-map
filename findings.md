@@ -19,7 +19,7 @@ packages/renderer/src/
 
 ### 关键发现
 1. `.env.local` 中 key 变量名为 `AMAP_KEY`，需要改为 `VITE_AMAP_KEY`（Vite 要求 `VITE_` 前缀才能暴露到前端）
-2. 高德 Key: `0532ebb20ce405b17ec00808ee3a96fb`
+2. 高德 Key: `***`（请使用你自己的 Key，通过 `.env.local` 配置）
 3. Drawer 组件硬编码"杭州市"，需要从 mapStore 读取实际选中城市
 4. App.tsx 中的 MAP PLACEHOLDER 需要替换为真实 MapView
 5. 抽屉状态管理用 useState 在 Drawer 内部，需要改为从 mapStore 驱动

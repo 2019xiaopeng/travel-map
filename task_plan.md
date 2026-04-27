@@ -25,7 +25,7 @@
 - `Drawer.tsx`：三段式（city/tripList/tripDetail）+ 面包屑，硬编码"杭州市"
 - 抽屉子组件：CityHome/TripList/TripDetail，全部静态占位
 - CSS 变量：暗色基调 `--color-bg: #0a0a0a`，`--color-accent: #3b82f6`
-- `.env.local` 已有 `AMAP_KEY=0532ebb20ce405b17ec00808ee3a96fb`
+- `.env.local` 已有 `AMAP_KEY=***`（不要把真实 Key 提交到仓库）
 
 ### Vite env 配置
 - 需要确保 `.env.local` 中的 key 被 Vite 识别为 `VITE_AMAP_KEY`
