@@ -52,6 +52,12 @@ VITE_AMAP_SECURITY_JS_CODE=your_security_js_code
 ### 3) 启动
 
 ```bash
+pnpm dev:electron
+```
+
+如果只想单独启动渲染进程（Vite）用于调试 UI：
+
+```bash
 pnpm dev
 ```
 
@@ -89,4 +95,3 @@ pnpm --filter @travel-map/app build:win
 ## License
 
 暂未指定。
-
