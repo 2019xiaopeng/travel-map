@@ -7,8 +7,6 @@ export function BreadCrumbOverlay() {
   const backToCountry = useMapStore((s) => s.backToCountry);
   const backToProvince = useMapStore((s) => s.backToProvince);
 
-  if (level === "country") return null;
-
   return (
     <div
       className="
@@ -18,15 +16,22 @@ export function BreadCrumbOverlay() {
         px-3 py-2 backdrop-blur-md text-xs
       "
     >
-      <button
-        onClick={backToCountry}
-        className="text-neutral-500 transition-colors hover:text-white"
-      >
-        全国
-      </button>
+      {level === "country" ? (
+        <span className="text-white font-medium">中国</span>
+      ) : (
+        <button
+          onClick={backToCountry}
+          className="text-neutral-500 transition-colors hover:text-white"
+        >
+          中国
+        </button>
+      )}
 
       {level === "province" && (
-        <span className="text-white font-medium">{provinceName}</span>
+        <>
+          <span className="text-neutral-700">/</span>
+          <span className="text-white font-medium">{provinceName}</span>
+        </>
       )}
 
       {level === "city" && (

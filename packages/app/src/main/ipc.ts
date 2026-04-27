@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from "electron";
+import { ipcMain, dialog, shell } from "electron";
 import { getDb } from "./db";
 import fs from "fs";
 import path from "path";
@@ -355,6 +355,23 @@ export function setupIpc() {
       };
     } catch (e: any) {
       console.error("Failed to save asset:", e);
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle("file:openLocal", async (event, payload: { localPath: string }) => {
+    assertSender(event);
+    try {
+      const userDataPath = app.getPath("userData");
+      const assetsRoot = path.resolve(path.join(userDataPath, "assets"));
+      const absolutePath = path.resolve(path.join(userDataPath, payload.localPath));
+      if (!absolutePath.startsWith(assetsRoot + path.sep)) {
+        return { error: "Access Denied" };
+      }
+      const err = await shell.openPath(absolutePath);
+      if (err) return { error: err };
+      return { ok: true };
+    } catch (e: any) {
       return { error: e.message };
     }
   });

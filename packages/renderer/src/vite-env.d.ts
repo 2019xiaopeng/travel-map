@@ -33,6 +33,7 @@ interface Window {
     file: {
       select: () => Promise<string | null>;
       saveAsset: (sourcePath: string, destRelativeDir: string) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
+      openLocal: (localPath: string) => Promise<{ ok?: boolean; error?: string }>;
     };
   };
 }

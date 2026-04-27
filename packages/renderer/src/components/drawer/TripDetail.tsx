@@ -370,7 +370,9 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                         </div>
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
-                            onClick={() => window.open(`local:///${a.local_path}`)}
+                            onClick={async () => {
+                              await window.travelMap.file.openLocal(a.local_path);
+                            }}
                             className="text-[var(--color-accent)] hover:text-blue-400 px-2"
                           >
                             打开

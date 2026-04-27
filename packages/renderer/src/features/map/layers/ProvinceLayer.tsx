@@ -27,15 +27,13 @@ export function ProvinceLayer({ map }: { map: any }) {
   const enterProvince = useMapStore((s) => s.enterProvince);
 
   const handleClick = useCallback(
-    (feature: GeoFeature) => {
+    (feature: GeoFeature, polygon: any) => {
       if (tooltipRef.current) {
         tooltipRef.current.hide();
       }
       const { id, name, center } = feature.properties;
       enterProvince(id, name);
-
-      const targetCenter = center ?? featureCenter(feature.geometry);
-      map.setZoomAndCenter(7, targetCenter, false, 600);
+      map.setFitView([polygon], false, [60, 60, 60, 60]);
     },
     [map, enterProvince],
   );
@@ -82,7 +80,7 @@ export function ProvinceLayer({ map }: { map: any }) {
           extData: feature.properties,
         });
 
-        polygon.on("click", () => handleClick(feature));
+        polygon.on("click", () => handleClick(feature, polygon));
         polygon.on("mouseover", (e: any) => {
           polygon.setOptions(HOVER_STYLE);
           if (tooltipRef.current) {
