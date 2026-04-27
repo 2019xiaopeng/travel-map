@@ -9,12 +9,16 @@ interface MapState {
   cityId: string | null;
   cityName: string | null;
   drawerOpen: boolean;
+  selectedPoiId: string | null;
+  selectedTripId: string | null;
 
   enterProvince: (id: string, name: string) => void;
   enterCity: (id: string, name: string) => void;
   backToCountry: () => void;
   backToProvince: () => void;
   setDrawerOpen: (open: boolean) => void;
+  selectPoi: (poiId: string | null) => void;
+  selectTrip: (tripId: string | null) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -24,6 +28,8 @@ export const useMapStore = create<MapState>((set) => ({
   cityId: null,
   cityName: null,
   drawerOpen: false,
+  selectedPoiId: null,
+  selectedTripId: null,
 
   enterProvince: (id, name) =>
     set({
@@ -33,6 +39,8 @@ export const useMapStore = create<MapState>((set) => ({
       cityId: null,
       cityName: null,
       drawerOpen: false,
+      selectedPoiId: null,
+      selectedTripId: null,
     }),
 
   enterCity: (id, name) =>
@@ -41,6 +49,8 @@ export const useMapStore = create<MapState>((set) => ({
       cityId: id,
       cityName: name,
       drawerOpen: true,
+      selectedPoiId: null,
+      selectedTripId: null,
     }),
 
   backToCountry: () =>
@@ -51,6 +61,8 @@ export const useMapStore = create<MapState>((set) => ({
       cityId: null,
       cityName: null,
       drawerOpen: false,
+      selectedPoiId: null,
+      selectedTripId: null,
     }),
 
   backToProvince: () =>
@@ -59,7 +71,11 @@ export const useMapStore = create<MapState>((set) => ({
       cityId: null,
       cityName: null,
       drawerOpen: false,
+      selectedPoiId: null,
+      selectedTripId: null,
     }),
 
   setDrawerOpen: (open) => set({ drawerOpen: open }),
+  selectPoi: (poiId) => set({ selectedPoiId: poiId, drawerOpen: true }),
+  selectTrip: (tripId) => set({ selectedTripId: tripId }),
 }));

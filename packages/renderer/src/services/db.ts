@@ -13,7 +13,13 @@ export const db = {
     );
 
     // Query city stats
-    const city = await window.travelMap.db.get(`SELECT * FROM City WHERE city_id = ?`, [cityId]);
+    const city = await window.travelMap.db.get(`
+      SELECT City.*, Asset.local_path as cover_path, Asset.remote_url as cover_remote 
+      FROM City 
+      LEFT JOIN Asset ON City.cover_asset_id = Asset.asset_id 
+      WHERE City.city_id = ?
+    `, [cityId]);
+    
     const trips = await window.travelMap.db.get(`SELECT COUNT(*) as count, SUM(cost_total) as totalCost FROM Trip WHERE city_id = ?`, [cityId]);
     const pois = await window.travelMap.db.get(`SELECT COUNT(*) as count FROM POI WHERE city_id = ?`, [cityId]);
 
@@ -26,7 +32,13 @@ export const db = {
   },
 
   async getTrips(cityId: string) {
-    return await window.travelMap.db.query(`SELECT * FROM Trip WHERE city_id = ? ORDER BY date_start DESC`, [cityId]);
+    return await window.travelMap.db.query(`
+      SELECT Trip.*, Asset.local_path as cover_path, Asset.remote_url as cover_remote 
+      FROM Trip 
+      LEFT JOIN Asset ON Trip.cover_asset_id = Asset.asset_id 
+      WHERE Trip.city_id = ? 
+      ORDER BY Trip.date_start DESC
+    `, [cityId]);
   },
 
   async getPois(cityId: string) {
@@ -78,8 +90,85 @@ export const db = {
   async deleteTrip(tripId: string) {
     await window.travelMap.db.run(`DELETE FROM Trip WHERE trip_id = ?`, [tripId]);
   },
+
+  async getTripCosts(tripId: string) {
+    return await window.travelMap.db.query(`SELECT * FROM CostBreakdown WHERE trip_id = ?`, [tripId]);
+  },
+
+  async updateTripCost(tripId: string, category: string, amount: number) {
+    await window.travelMap.db.run(`
+      INSERT INTO CostBreakdown (trip_id, category, amount)
+      VALUES (?, ?, ?)
+      ON CONFLICT(trip_id, category) DO UPDATE SET amount=excluded.amount
+    `, [tripId, category, amount]);
+
+    // Recalculate total cost
+    const res = await window.travelMap.db.get(`SELECT SUM(amount) as total FROM CostBreakdown WHERE trip_id = ?`, [tripId]);
+    const total = res?.total || 0;
+    await window.travelMap.db.run(`UPDATE Trip SET cost_total = ? WHERE trip_id = ?`, [total, tripId]);
+    return total;
+  },
+
+  async deleteTripCost(tripId: string, category: string) {
+    await window.travelMap.db.run(`DELETE FROM CostBreakdown WHERE trip_id = ? AND category = ?`, [tripId, category]);
+    
+    // Recalculate total cost
+    const res = await window.travelMap.db.get(`SELECT SUM(amount) as total FROM CostBreakdown WHERE trip_id = ?`, [tripId]);
+    const total = res?.total || 0;
+    await window.travelMap.db.run(`UPDATE Trip SET cost_total = ? WHERE trip_id = ?`, [total, tripId]);
+    return total;
+  },
+
+  async getTripAttachments(tripId: string) {
+    return await window.travelMap.db.query(`
+      SELECT a.* FROM Asset a
+      JOIN Tag t ON t.name = a.asset_id
+      WHERE t.entity_type = 'trip_attachment' AND t.entity_id = ?
+    `, [tripId]);
+  },
   
   async getTrip(tripId: string) {
-    return await window.travelMap.db.get(`SELECT * FROM Trip WHERE trip_id = ?`, [tripId]);
+    return await window.travelMap.db.get(`
+      SELECT Trip.*, Asset.local_path as cover_path, Asset.remote_url as cover_remote 
+      FROM Trip 
+      LEFT JOIN Asset ON Trip.cover_asset_id = Asset.asset_id 
+      WHERE Trip.trip_id = ?
+    `, [tripId]);
+  },
+
+  async addTag(entityType: string, entityId: string, name: string) {
+    await window.travelMap.db.run(`INSERT OR IGNORE INTO Tag (entity_type, entity_id, name) VALUES (?, ?, ?)`, [entityType, entityId, name]);
+  },
+
+  async getPoisForTrip(tripId: string) {
+    return await window.travelMap.db.query(`
+      SELECT p.*, tp.sort_order
+      FROM POI p
+      JOIN Trip_POI tp ON p.poi_id = tp.poi_id
+      WHERE tp.trip_id = ?
+      ORDER BY tp.sort_order ASC
+    `, [tripId]);
+  },
+
+  async getTags(entityType: string, entityId: string) {
+    const res = await window.travelMap.db.query(`SELECT name FROM Tag WHERE entity_type = ? AND entity_id = ?`, [entityType, entityId]);
+    return res.map((r: any) => r.name);
+  },
+
+  async removeTag(entityType: string, entityId: string, name: string) {
+    await window.travelMap.db.run(`DELETE FROM Tag WHERE entity_type = ? AND entity_id = ? AND name = ?`, [entityType, entityId, name]);
+  },
+
+  async getPoi(poiId: string) {
+    return await window.travelMap.db.get(`SELECT * FROM POI WHERE poi_id = ?`, [poiId]);
+  },
+
+  async getTripsForPoi(poiId: string) {
+    return await window.travelMap.db.query(`
+      SELECT t.* 
+      FROM Trip t
+      JOIN Trip_POI tp ON t.trip_id = tp.trip_id
+      WHERE tp.poi_id = ?
+    `, [poiId]);
   }
 };

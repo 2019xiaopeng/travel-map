@@ -3,13 +3,14 @@ import { useMapStore } from "../features/map/mapStore";
 import { CityHome } from "./drawer/CityHome";
 import { TripList } from "./drawer/TripList";
 import { TripDetail } from "./drawer/TripDetail";
+import { PoiDetail } from "./drawer/PoiDetail";
 
 interface DrawerProps {
   open: boolean;
   onClose: () => void;
 }
 
-type DrawerView = "city-home" | "trip-list" | "trip-detail";
+type DrawerView = "city-home" | "trip-list" | "trip-detail" | "poi-detail";
 
 export function Drawer({ open, onClose }: DrawerProps) {
   const level = useMapStore((s) => s.level);
@@ -17,18 +18,31 @@ export function Drawer({ open, onClose }: DrawerProps) {
   const cityName = useMapStore((s) => s.cityName);
   const cityId = useMapStore((s) => s.cityId);
   const provinceId = useMapStore((s) => s.provinceId);
+  const selectedPoiId = useMapStore((s) => s.selectedPoiId);
+  const selectPoi = useMapStore((s) => s.selectPoi);
+  const selectedTripId = useMapStore((s) => s.selectedTripId);
+  const selectTrip = useMapStore((s) => s.selectTrip);
 
   const visible = level !== "country" && open;
   
   const [view, setView] = useState<DrawerView>("city-home");
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [previousView, setPreviousView] = useState<DrawerView>("city-home");
 
   useEffect(() => {
     if (!open) {
       setView("city-home");
-      setSelectedTripId(null);
+      selectTrip(null);
+      selectPoi(null);
     }
-  }, [open, cityId]);
+  }, [open, cityId, selectPoi, selectTrip]);
+
+  // Handle POI selection from map
+  useEffect(() => {
+    if (selectedPoiId) {
+      setPreviousView(view);
+      setView("poi-detail");
+    }
+  }, [selectedPoiId]);
 
   return (
     <aside
@@ -52,8 +66,15 @@ export function Drawer({ open, onClose }: DrawerProps) {
           {view !== "city-home" && (
             <button
               onClick={() => {
-                if (view === "trip-detail") setView("trip-list");
-                else setView("city-home");
+                if (view === "poi-detail") {
+                  setView(previousView === "poi-detail" ? "city-home" : previousView);
+                  selectPoi(null);
+                } else if (view === "trip-detail") {
+                  setView("trip-list");
+                  selectTrip(null);
+                } else {
+                  setView("city-home");
+                }
               }}
               className="text-xs text-neutral-400 hover:text-white"
             >
@@ -95,7 +116,7 @@ export function Drawer({ open, onClose }: DrawerProps) {
               <TripList 
                 cityId={cityId} 
                 onSelectTrip={(id) => {
-                  setSelectedTripId(id);
+                  selectTrip(id);
                   setView("trip-detail");
                 }} 
               />
@@ -103,7 +124,19 @@ export function Drawer({ open, onClose }: DrawerProps) {
             {view === "trip-detail" && selectedTripId && (
               <TripDetail 
                 tripId={selectedTripId} 
-                onBack={() => setView("trip-list")} 
+                onBack={() => {
+                  setView("trip-list");
+                  selectTrip(null);
+                }} 
+              />
+            )}
+            {view === "poi-detail" && selectedPoiId && (
+              <PoiDetail
+                poiId={selectedPoiId}
+                onBack={() => {
+                  setView(previousView === "poi-detail" ? "city-home" : previousView);
+                  selectPoi(null);
+                }}
               />
             )}
           </>

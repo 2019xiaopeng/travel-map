@@ -63,10 +63,14 @@ CREATE TABLE IF NOT EXISTS Trip_POI (
 CREATE TABLE IF NOT EXISTS Tag (
   entity_type TEXT,
   entity_id TEXT,
-  name TEXT
+  name TEXT,
+  PRIMARY KEY (entity_type, entity_id, name)
 );
 
 CREATE INDEX IF NOT EXISTS idx_tag_entity ON Tag(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_city_province ON City(province_id);
+CREATE INDEX IF NOT EXISTS idx_trip_city ON Trip(city_id);
+CREATE INDEX IF NOT EXISTS idx_poi_city ON POI(city_id);
 
 CREATE TABLE IF NOT EXISTS CostBreakdown (
   trip_id TEXT REFERENCES Trip(trip_id) ON DELETE CASCADE,
