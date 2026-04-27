@@ -29,32 +29,36 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
       const AMap = window.AMap;
 
       const markers = pois.map((poi: any) => {
-        // Render custom content based on category
-        const isRestaurant = poi.category?.includes('餐饮') || poi.category?.includes('美食');
-        const isHotel = poi.category?.includes('住宿') || poi.category?.includes('酒店');
-        const isAttraction = poi.category?.includes('景点') || poi.category?.includes('风景');
-        
-        let emoji = '📍';
-        let bgColor = 'bg-blue-500';
-        if (isRestaurant) { emoji = '🍽️'; bgColor = 'bg-orange-500'; }
-        else if (isHotel) { emoji = '🏨'; bgColor = 'bg-purple-500'; }
-        else if (isAttraction) { emoji = '📸'; bgColor = 'bg-emerald-500'; }
+        const isRestaurant = poi.category?.includes("餐饮") || poi.category?.includes("美食");
+        const isHotel = poi.category?.includes("住宿") || poi.category?.includes("酒店");
+        const isAttraction = poi.category?.includes("景点") || poi.category?.includes("风景");
 
-        // Check if poi is in trip
+        let emoji = "📍";
+        let bg = "#3b82f6";
+        if (isRestaurant) {
+          emoji = "🍽️";
+          bg = "#f97316";
+        } else if (isHotel) {
+          emoji = "🏨";
+          bg = "#a855f7";
+        } else if (isAttraction) {
+          emoji = "📸";
+          bg = "#10b981";
+        }
+
         const tripIndex = tripPois.findIndex((tp: any) => tp.poi_id === poi.poi_id);
         const inTrip = tripIndex !== -1;
         const safeName = escapeHtml(poi.name);
-        const tripBadge = inTrip 
-          ? `<div class="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-accent)] text-[10px] font-bold text-white shadow-sm border border-white z-10">${tripIndex + 1}</div>` 
-          : '';
-
+        const badge = inTrip
+          ? `<div style="position:absolute;top:-6px;right:-6px;display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:9999px;background:var(--color-accent);color:#fff;font-size:10px;font-weight:700;border:1px solid rgba(255,255,255,0.9);box-shadow:0 1px 4px rgba(0,0,0,0.35);">${tripIndex + 1}</div>`
+          : "";
         const content = `
-          <div class="relative flex flex-col items-center group cursor-pointer transition-all duration-300 ${inTrip ? 'scale-110' : 'opacity-80 hover:opacity-100'}">
-            ${tripBadge}
-            <div class="flex h-8 w-8 items-center justify-center rounded-full ${bgColor} border-2 border-white shadow-md transition-transform group-hover:scale-110">
-              <span class="text-sm">${emoji}</span>
+          <div style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:${inTrip ? "scale(1.1)" : "scale(1)"};opacity:${inTrip ? "1" : "0.85"};transition:transform 200ms ease, opacity 200ms ease;">
+            ${badge}
+            <div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9999px;background:${bg};border:2px solid rgba(255,255,255,0.9);box-shadow:0 3px 10px rgba(0,0,0,0.35);">
+              <span style="font-size:14px;line-height:1;">${emoji}</span>
             </div>
-            <div class="mt-1 hidden whitespace-nowrap rounded bg-[var(--color-surface)]/90 px-2 py-0.5 text-[10px] text-white shadow-lg backdrop-blur-sm group-hover:block z-20 absolute top-8">
+            <div style="margin-top:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(23,23,23,0.85);color:#fff;font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(6px);">
               ${safeName}
             </div>
           </div>
@@ -81,7 +85,6 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
       markersRef.current = markers;
       map.add(markers);
 
-      // Draw polyline for trip route
       if (polylineRef.current) {
         polylineRef.current.setMap(null);
         polylineRef.current = null;
@@ -105,15 +108,13 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
         });
         map.add(polylineRef.current);
         
-        // Smoothly fit view to show the entire trip route
         if (selectedTripId) {
-          map.setFitView([polylineRef.current], false, [60, 60, 60, 360]); // Left padding for drawer
+          map.setFitView([polylineRef.current], false, [60, 60, 60, 360]);
         }
       } else if (tripPois.length === 1 && selectedTripId) {
         const p = tripPois[0];
         map.panTo([p.gcj02_lng || p.lng, p.gcj02_lat || p.lat]);
       } else if (pois.length > 0 && !selectedTripId) {
-        // If no trip is selected, fit view to all POIs
         map.setFitView(markers, false, [60, 60, 60, 360]);
       }
     };

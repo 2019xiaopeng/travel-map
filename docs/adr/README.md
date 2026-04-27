@@ -6,4 +6,4 @@
 - [ADR-0002 资源落盘与 local:// 访问边界](file:///workspace/docs/adr/ADR-0002-asset-storage-and-local-protocol.md)
 - [ADR-0003 Tailwind v4 动画实现方式](file:///workspace/docs/adr/ADR-0003-tailwind-animation-tokens.md)
 - [ADR-0004 对齐交互规范：抽屉/面包屑/镜头策略](file:///workspace/docs/adr/ADR-0004-interaction-alignment.md)
-
+- [ADR-0005 地图标注 DOM 样式不依赖 Tailwind 扫描](file:///workspace/docs/adr/ADR-0005-map-marker-styling.md)
