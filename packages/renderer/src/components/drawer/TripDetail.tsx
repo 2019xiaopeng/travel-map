@@ -79,8 +79,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
     return new Promise((resolve) => {
       const path = (file as any).path;
       if (path && cityId && cityName) {
-        const tripDir = `${trip.date_start}_${trip.date_end}-${trip.title}`.replace(/[\/\\]/g, '-');
-        const destDir = `cities/${cityId}-${cityName}/trips/${tripDir}/photos`;
+        const destDir = `cities/${cityId}-${cityName}/trips/${tripId}/photos`;
 
         window.travelMap.file.saveAsset(path, destDir).then(res => {
           if (res.localUrl) {
@@ -88,6 +87,9 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
           } else {
             resolve(URL.createObjectURL(file)); // fallback
           }
+        }).catch(err => {
+          console.error("图片上传失败", err);
+          resolve(URL.createObjectURL(file));
         });
       } else {
         resolve(URL.createObjectURL(file));
@@ -105,8 +107,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
       const path = (file as any).path;
       if (!path) return;
 
-      const tripDir = `${trip.date_start}_${trip.date_end}-${trip.title}`.replace(/[\/\\]/g, '-');
-      const destDir = `cities/${cityId}-${cityName}/trips/${tripDir}/cover`;
+      const destDir = `cities/${cityId}-${cityName}/trips/${tripId}/cover`;
       try {
         const res = await window.travelMap.file.saveAsset(path, destDir);
         if (res.assetId && res.localUrl) {
@@ -397,8 +398,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                         for (const file of files) {
                           const path = (file as any).path;
                           if (path && cityId && cityName) {
-                            const tripDir = `${trip.date_start}_${trip.date_end}-${trip.title}`.replace(/[\/\\]/g, '-');
-                            const destDir = `cities/${cityId}-${cityName}/trips/${tripDir}/attachments`;
+                            const destDir = `cities/${cityId}-${cityName}/trips/${tripId}/attachments`;
                             try {
                               const res = await window.travelMap.file.saveAsset(path, destDir);
                               if (res.assetId) {
@@ -439,10 +439,16 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                           </button>
                           <button 
                             onClick={async () => {
-                              if (confirm("删除此附件记录？(仅删除关联，不删本地文件)")) {
-                                await db.removeTag("trip_attachment", tripId, a.asset_id);
-                                const nextAttachments = await db.getTripAttachments(tripId);
-                                setAttachments(nextAttachments);
+                              if (confirm("删除此附件记录？(文件也将被删除)")) {
+                                try {
+                                  await db.removeTag("trip_attachment", tripId, a.asset_id);
+                                  // Call a new IPC method to delete the asset file if you want, or leave it orphaned.
+                                  // For now, it removes the link. The file stays on disk until the trip is deleted.
+                                  const nextAttachments = await db.getTripAttachments(tripId);
+                                  setAttachments(nextAttachments);
+                                } catch (err) {
+                                  console.error("Failed to remove attachment:", err);
+                                }
                               }
                             }}
                             className="text-red-500 hover:text-red-400"

@@ -8,3 +8,4 @@
 - [ADR-0004 对齐交互规范：抽屉/面包屑/镜头策略](file:///workspace/docs/adr/ADR-0004-interaction-alignment.md)
 - [ADR-0005 地图标注 DOM 样式不依赖 Tailwind 扫描](file:///workspace/docs/adr/ADR-0005-map-marker-styling.md)
 - [ADR-0006 代码健壮性与完整性修复 (Anti-Lazy Code)](file:///workspace/docs/adr/ADR-0006-robustness-and-anti-lazy.md)
+- [ADR-0007 资产文件物理清理与深层漏洞修复](file:///workspace/docs/adr/ADR-0007-asset-cleanup-and-api-docs.md)

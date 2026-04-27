@@ -103,10 +103,34 @@ export function setupIpc() {
   ipcMain.handle("db:deleteTrip", (event, payload: { tripId: string }) => {
     assertSender(event);
     const db = getDb();
+    
+    // Find associated assets to delete them from disk
+    const assets = db.prepare(`SELECT local_path FROM Asset WHERE local_path LIKE '%/trips/' || ? || '/%'`).all(payload.tripId) as any[];
+    const userDataPath = app.getPath("userData");
+    
     db.transaction(() => {
+      // 1. Delete associated tags (attachments, etc)
       db.prepare(`DELETE FROM Tag WHERE entity_type IN ('trip', 'trip_attachment') AND entity_id = ?`).run(payload.tripId);
+      
+      // 2. Delete Asset records associated with this trip's folder
+      db.prepare(`DELETE FROM Asset WHERE local_path LIKE '%/trips/' || ? || '/%'`).run(payload.tripId);
+      
+      // 3. Delete the trip itself
       db.prepare(`DELETE FROM Trip WHERE trip_id = ?`).run(payload.tripId);
     })();
+    
+    // Physically delete the files (fire and forget, since it's a cleanup)
+    for (const asset of assets) {
+      if (asset.local_path) {
+        const fullPath = path.resolve(path.join(userDataPath, asset.local_path));
+        fs.unlink(fullPath, (err) => {
+          if (err && err.code !== 'ENOENT') {
+            console.error(`Failed to delete asset file: ${fullPath}`, err);
+          }
+        });
+      }
+    }
+    
     return { ok: true };
   });
 

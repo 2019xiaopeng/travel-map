@@ -3,12 +3,12 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "outDir": "./dist",
-    "rootDir": "src",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@travel-map/core": ["../core/src"]
-    }
+    },
+    "ignoreDeprecations": "5.0"
   },
   "include": ["src"]
 }

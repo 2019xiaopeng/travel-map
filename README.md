@@ -40,14 +40,21 @@
 pnpm install
 ```
 
-### 2) 配置环境变量（高德）
+### 2) 配置环境变量（高德地图 API Key）
 
-复制并创建 `.env.local`（不要提交到仓库）：
+为了让地图正常加载，你需要自己去[高德开放平台](https://console.amap.com/dev/key/app)申请一个 Web 端 (JS API) 的 Key。
+
+1. 登录高德开放平台，进入“应用管理” -> “我的应用” -> “创建新应用”。
+2. 在应用下点击“添加 Key”，服务平台选择 **Web 端 (JS API)**。
+3. 提交后，你会获得一个 **Key** 和一个 **安全密钥 (Security JS Code)**。
+4. 在项目根目录（或 `packages/renderer` 目录）下创建 `.env.local` 文件（该文件已被 git 忽略）：
 
 ```env
-VITE_AMAP_KEY=your_amap_key
-VITE_AMAP_SECURITY_JS_CODE=your_security_js_code
+VITE_AMAP_KEY=你的高德Key
+VITE_AMAP_SECURITY_JS_CODE=你的高德安全密钥
 ```
+
+> **注意**：如果你申请的是新版高德 Key，必须同时配置 `VITE_AMAP_SECURITY_JS_CODE`，否则地图会因鉴权失败而无法加载。
 
 ### 3) 启动
 
