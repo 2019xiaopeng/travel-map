@@ -66,7 +66,11 @@ app.whenReady().then(() => {
       const asset = db.prepare(`SELECT remote_url FROM Asset WHERE local_path = ?`).get(relativePath) as any;
       
       if (asset && asset.remote_url) {
-        return Response.redirect(asset.remote_url, 302);
+        const target = new URL(asset.remote_url);
+        if (target.protocol !== 'https:') {
+          return new Response('Invalid remote url', { status: 400 });
+        }
+        return Response.redirect(target.toString(), 302);
       }
 
       return new Response('Not Found', { status: 404 });

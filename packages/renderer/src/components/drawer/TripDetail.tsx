@@ -22,38 +22,36 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
   const cityName = useMapStore((s) => s.cityName);
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+    (async () => {
+      try {
+        const t = await db.getTrip(tripId);
+        if (cancelled) return;
+        setTrip(t);
+        const [nextCosts, nextTags, nextPois] = await Promise.all([
+          db.getTripCosts(tripId),
+          db.getTags("trip", tripId),
+          db.getPoisForTrip(tripId),
+        ]);
+        if (cancelled) return;
+        setCosts(nextCosts);
+        setTags(nextTags);
+        setPois(nextPois);
+      } catch {
+        if (!cancelled) setTrip(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [tripId]);
-
-  const loadData = async () => {
-    const t = await db.getTrip(tripId);
-    setTrip(t);
-    loadCosts();
-    loadTags();
-    loadPois();
-  };
-
-  const loadCosts = async () => {
-    const res = await db.getTripCosts(tripId);
-    setCosts(res);
-  };
-
-  const loadTags = async () => {
-    const res = await db.getTags("trip", tripId);
-    setTags(res);
-  };
-
-  const loadPois = async () => {
-    const res = await db.getPoisForTrip(tripId);
-    setPois(res);
-  };
 
   if (!trip) return <div className="p-5 text-neutral-500">加载中...</div>;
 
   const handleChange = (field: string, value: any) => {
     const updated = { ...trip, [field]: value };
     setTrip(updated);
-    db.updateTrip(updated);
+    db.updateTrip(updated).catch(() => {});
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
@@ -178,7 +176,8 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                   const tag = prompt("输入新标签:");
                   if (tag) {
                     await db.addTag("trip", tripId, tag);
-                    loadTags();
+                    const nextTags = await db.getTags("trip", tripId);
+                    setTags(nextTags);
                   }
                 }}
                 className="text-[10px] text-[var(--color-accent)] hover:text-white"
@@ -196,7 +195,8 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                   <button 
                     onClick={async () => {
                       await db.removeTag("trip", tripId, t);
-                      loadTags();
+                      const nextTags = await db.getTags("trip", tripId);
+                      setTags(nextTags);
                     }}
                     className="ml-1 hidden text-red-400 hover:text-red-300 group-hover:inline-block"
                   >
@@ -275,7 +275,10 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                       const amount = prompt("输入花费金额:");
                       if (category && amount && !isNaN(Number(amount))) {
                         await db.updateTripCost(tripId, category, Number(amount));
-                        loadData(); // refresh total
+                        const t = await db.getTrip(tripId);
+                        const nextCosts = await db.getTripCosts(tripId);
+                        setTrip(t);
+                        setCosts(nextCosts);
                       }
                     }}
                     className="text-xs text-[var(--color-accent)] hover:text-white"
@@ -294,7 +297,10 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                             onClick={async () => {
                               if (confirm(`删除 ${c.category} 的花费记录？`)) {
                                 await db.deleteTripCost(tripId, c.category);
-                                loadData();
+                                const t = await db.getTrip(tripId);
+                                const nextCosts = await db.getTripCosts(tripId);
+                                setTrip(t);
+                                setCosts(nextCosts);
                               }
                             }}
                             className="text-red-500 hover:text-red-400"
