@@ -266,7 +266,8 @@ export function setupIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle("file:select", async () => {
+  ipcMain.handle("file:select", async (event) => {
+    assertSender(event);
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile"],
       filters: [{ name: "Images", extensions: ["jpg", "png", "gif", "webp"] }],

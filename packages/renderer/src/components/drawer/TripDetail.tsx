@@ -230,7 +230,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                     view: {
                       menu: true,
                       md: true,
-                      html: true
+                    html: false
                     }
                   }}
                 />

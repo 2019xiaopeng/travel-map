@@ -20,7 +20,10 @@ function createWindow() {
     title: "旅行地图",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
-      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      sandbox: true,
     },
   });
 
@@ -29,8 +32,25 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url);
+    try {
+      const url = new URL(details.url);
+      if (url.protocol === "https:") {
+        shell.openExternal(url.toString());
+      }
+    } catch {}
     return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    const allow = url.startsWith("file://") || url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1");
+    if (allow) return;
+    event.preventDefault();
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "https:") {
+        shell.openExternal(parsed.toString());
+      }
+    } catch {}
   });
 
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
@@ -51,9 +71,12 @@ app.whenReady().then(() => {
       const relativePath = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
       const userDataPath = app.getPath('userData');
       const absolutePath = resolve(join(userDataPath, relativePath));
+      const assetsRoot = resolve(join(userDataPath, 'assets'));
+      const sep = normalize('/');
+      const assetsRootWithSep = assetsRoot.endsWith(sep) ? assetsRoot : `${assetsRoot}${sep}`;
 
       // Security check: prevent path traversal
-      if (!absolutePath.startsWith(resolve(userDataPath))) {
+      if (!absolutePath.startsWith(assetsRootWithSep)) {
         return new Response('Access Denied', { status: 403 });
       }
 
