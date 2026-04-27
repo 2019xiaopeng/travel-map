@@ -55,7 +55,7 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
             if (!file) return;
             const sourcePath = (file as any).path;
             if (!sourcePath) return;
-            const destDir = `cities/${cityId}-${cityName}/cover`;
+            const destDir = `cities/${cityId}-${cityName}/city-cover`;
             try {
               const res = await window.travelMap.file.saveAsset(sourcePath, destDir);
               if (!res.assetId) return;
