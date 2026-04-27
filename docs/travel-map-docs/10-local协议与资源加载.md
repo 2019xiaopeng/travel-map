@@ -14,7 +14,7 @@
 
 主进程拦截后：
 1) 去掉 `local://` 前缀，取 URL pathname  
-2) 拼接应用数据目录：`path.join(APP_DATA_DIR, pathname)`  
+2) 拼接应用数据目录：`path.join(APP_DATA_DIR, pathname)`（其中 pathname 以 `assets/` 开头）  
 3) 用 `protocol.handle(...)` 或 `net.fetch(file://...)` 返回文件流响应
 
 ### 1.2 安全边界（LFI 防御，必须做）
@@ -26,12 +26,12 @@
 
 ```js
 const normalized = path.normalize(realPath);
-if (!normalized.startsWith(APP_DATA_DIR)) {
+if (!normalized.startsWith(path.join(APP_DATA_DIR, 'assets'))) {
   return new Response('Access Denied', { status: 403 });
 }
 ```
 
-> 只允许访问 APP_DATA_DIR 目录内的资源。
+> 只允许访问 `APP_DATA_DIR/assets` 目录内的资源。
 
 ## 2. 本地优先 + fallback 到 remote_url（两种实现）
 
@@ -56,4 +56,3 @@ if (!normalized.startsWith(APP_DATA_DIR)) {
    - 方案 B2：主进程作为代理流（`fetch(remote_url)` 再把响应流转给渲染层），可规避某些跨域限制
 
 > 我们已确认：正文默认插入 local://；同步到 R2 后由渲染层/协议层使用 remote_url 兜底。
-

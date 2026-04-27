@@ -56,11 +56,13 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
             const sourcePath = (file as any).path;
             if (!sourcePath) return;
             const destDir = `cities/${cityId}-${cityName}/cover`;
-            const res = await window.travelMap.file.saveAsset(sourcePath, destDir);
-            if (!res.assetId) return;
-            await window.travelMap.db.updateCityCover({ cityId, assetId: res.assetId });
-            const updatedCity = await db.getCity(cityId, provinceId, cityName, provinceName);
-            setData(updatedCity);
+            try {
+              const res = await window.travelMap.file.saveAsset(sourcePath, destDir);
+              if (!res.assetId) return;
+              await window.travelMap.db.updateCityCover({ cityId, assetId: res.assetId });
+              const updatedCity = await db.getCity(cityId, provinceId, cityName, provinceName);
+              setData(updatedCity);
+            } catch {}
           };
           input.click();
         }}

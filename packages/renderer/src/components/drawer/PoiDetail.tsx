@@ -12,15 +12,22 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
   const [tags, setTags] = useState<string[]>([]);
 
   useEffect(() => {
-    db.getPoi(poiId).then(setPoi);
-    db.getTripsForPoi(poiId).then(setTrips);
-    loadTags();
+    let cancelled = false;
+    (async () => {
+      const [nextPoi, nextTrips, nextTags] = await Promise.all([
+        db.getPoi(poiId),
+        db.getTripsForPoi(poiId),
+        db.getTags("poi", poiId),
+      ]);
+      if (cancelled) return;
+      setPoi(nextPoi);
+      setTrips(nextTrips);
+      setTags(nextTags);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [poiId]);
-
-  const loadTags = async () => {
-    const res = await db.getTags("poi", poiId);
-    setTags(res);
-  };
 
   if (!poi) return <div className="p-5 text-neutral-500">加载中...</div>;
 
@@ -79,7 +86,8 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
                 const tag = prompt("输入新标签:");
                 if (tag) {
                   await db.addTag("poi", poiId, tag);
-                  loadTags();
+                  const nextTags = await db.getTags("poi", poiId);
+                  setTags(nextTags);
                 }
               }}
               className="text-[10px] text-[var(--color-accent)] hover:text-white"
@@ -97,7 +105,8 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
                 <button 
                   onClick={async () => {
                     await db.removeTag("poi", poiId, t);
-                    loadTags();
+                    const nextTags = await db.getTags("poi", poiId);
+                    setTags(nextTags);
                   }}
                   className="ml-1 hidden text-red-400 hover:text-red-300 group-hover:inline-block"
                 >
