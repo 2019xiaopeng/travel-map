@@ -103,7 +103,10 @@ export function setupIpc() {
   ipcMain.handle("db:deleteTrip", (event, payload: { tripId: string }) => {
     assertSender(event);
     const db = getDb();
-    db.prepare(`DELETE FROM Trip WHERE trip_id = ?`).run(payload.tripId);
+    db.transaction(() => {
+      db.prepare(`DELETE FROM Tag WHERE entity_type IN ('trip', 'trip_attachment') AND entity_id = ?`).run(payload.tripId);
+      db.prepare(`DELETE FROM Trip WHERE trip_id = ?`).run(payload.tripId);
+    })();
     return { ok: true };
   });
 
@@ -185,22 +188,35 @@ export function setupIpc() {
     const db = getDb();
     const poiId = crypto.randomUUID();
     const now = Date.now();
-    db.prepare(`
-      INSERT INTO POI (poi_id, city_id, name, lng, lat, gcj02_lng, gcj02_lat, category, summary, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      poiId,
-      payload.city_id,
-      payload.name,
-      payload.lng,
-      payload.lat,
-      payload.gcj02_lng,
-      payload.gcj02_lat,
-      payload.category || "other",
-      payload.summary || "",
-      now,
-      now,
-    );
+    
+    db.transaction(() => {
+      db.prepare(`
+        INSERT INTO POI (poi_id, city_id, name, lng, lat, gcj02_lng, gcj02_lat, category, summary, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        poiId,
+        payload.city_id,
+        payload.name || "未命名地点",
+        payload.lng,
+        payload.lat,
+        payload.gcj02_lng,
+        payload.gcj02_lat,
+        payload.category || "",
+        payload.summary || "",
+        now,
+        now
+      );
+
+      if (payload.trip_id) {
+        // Find the current max sort_order
+        const res = db.prepare(`SELECT MAX(sort_order) as max_sort FROM Trip_POI WHERE trip_id = ?`).get(payload.trip_id) as any;
+        const sortOrder = (res?.max_sort || 0) + 1;
+        db.prepare(`
+          INSERT INTO Trip_POI (trip_id, poi_id, sort_order) VALUES (?, ?, ?)
+        `).run(payload.trip_id, poiId, sortOrder);
+      }
+    })();
+    
     return poiId;
   });
 
@@ -227,7 +243,10 @@ export function setupIpc() {
   ipcMain.handle("db:deletePoi", (event, payload: { poiId: string }) => {
     assertSender(event);
     const db = getDb();
-    db.prepare(`DELETE FROM POI WHERE poi_id = ?`).run(payload.poiId);
+    db.transaction(() => {
+      db.prepare(`DELETE FROM Tag WHERE entity_type = 'poi' AND entity_id = ?`).run(payload.poiId);
+      db.prepare(`DELETE FROM POI WHERE poi_id = ?`).run(payload.poiId);
+    })();
     return { ok: true };
   });
 
@@ -241,12 +260,32 @@ export function setupIpc() {
     assertSender(event);
     const db = getDb();
     return db.prepare(`
-      SELECT p.*, tp.sort_order
-      FROM POI p
-      JOIN Trip_POI tp ON p.poi_id = tp.poi_id
-      WHERE tp.trip_id = ?
-      ORDER BY tp.sort_order ASC
+      SELECT POI.*, Trip_POI.sort_order
+      FROM POI
+      JOIN Trip_POI ON POI.poi_id = Trip_POI.poi_id
+      WHERE Trip_POI.trip_id = ?
+      ORDER BY Trip_POI.sort_order ASC
     `).all(payload.tripId);
+  });
+
+  ipcMain.handle("db:addPoiToTrip", (event, payload: { tripId: string; poiId: string }) => {
+    assertSender(event);
+    const db = getDb();
+    db.transaction(() => {
+      const res = db.prepare(`SELECT MAX(sort_order) as max_sort FROM Trip_POI WHERE trip_id = ?`).get(payload.tripId) as any;
+      const sortOrder = (res?.max_sort || 0) + 1;
+      db.prepare(`
+        INSERT OR IGNORE INTO Trip_POI (trip_id, poi_id, sort_order) VALUES (?, ?, ?)
+      `).run(payload.tripId, payload.poiId, sortOrder);
+    })();
+    return { ok: true };
+  });
+
+  ipcMain.handle("db:removePoiFromTrip", (event, payload: { tripId: string; poiId: string }) => {
+    assertSender(event);
+    const db = getDb();
+    db.prepare(`DELETE FROM Trip_POI WHERE trip_id = ? AND poi_id = ?`).run(payload.tripId, payload.poiId);
+    return { ok: true };
   });
 
   ipcMain.handle("db:getTripsForPoi", (event, payload: { poiId: string }) => {

@@ -63,6 +63,14 @@ export const db = {
     return await window.travelMap.db.getPoisForTrip({ tripId });
   },
 
+  async addPoiToTrip(tripId: string, poiId: string) {
+    return await window.travelMap.db.addPoiToTrip({ tripId, poiId });
+  },
+
+  async removePoiFromTrip(tripId: string, poiId: string) {
+    return await window.travelMap.db.removePoiFromTrip({ tripId, poiId });
+  },
+
   async getTags(entityType: string, entityId: string) {
     const res = await window.travelMap.db.getTags({ entityType, entityId });
     return (res ?? []).map((r: any) => r.name);

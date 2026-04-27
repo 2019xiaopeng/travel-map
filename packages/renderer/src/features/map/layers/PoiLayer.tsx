@@ -22,9 +22,10 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
     let cancelled = false;
 
     const loadPois = async () => {
-      const pois = await db.getPois(cityId);
-      const tripPois = selectedTripId ? await db.getPoisForTrip(selectedTripId) : [];
-      if (cancelled) return;
+      try {
+        const pois = await db.getPois(cityId);
+        const tripPois = selectedTripId ? await db.getPoisForTrip(selectedTripId) : [];
+        if (cancelled) return;
 
       const AMap = window.AMap;
 
@@ -117,6 +118,9 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
       } else if (pois.length > 0 && !selectedTripId) {
         map.setFitView(markers, false, [60, 60, 60, 360]);
       }
+      } catch (err) {
+        console.error("Failed to load POIs:", err);
+      }
     };
 
     loadPois();
@@ -127,16 +131,22 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
     const handleRightClick = async (e: any) => {
       const name = prompt("输入 POI 名称:");
       if (name) {
-        const lnglat = e.lnglat;
-        await db.createPoi({
-          city_id: cityId,
-          name,
-          lng: lnglat.getLng(),
-          lat: lnglat.getLat(),
-          gcj02_lng: lnglat.getLng(),
-          gcj02_lat: lnglat.getLat(),
-        });
-        window.dispatchEvent(new Event('poi-added'));
+        try {
+          const lnglat = e.lnglat;
+          await db.createPoi({
+            city_id: cityId,
+            trip_id: selectedTripId,
+            name,
+            lng: lnglat.getLng(),
+            lat: lnglat.getLat(),
+            gcj02_lng: lnglat.getLng(),
+            gcj02_lat: lnglat.getLat(),
+          });
+          window.dispatchEvent(new Event('poi-added'));
+        } catch (err) {
+          console.error("Failed to create POI:", err);
+          alert("添加失败");
+        }
       }
     };
 

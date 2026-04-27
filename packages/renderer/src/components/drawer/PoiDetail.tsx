@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { db } from "../../services/db";
+import { POI, Trip } from "../../types";
+import { useMapStore } from "../../features/map/mapStore";
 
 interface PoiDetailProps {
   poiId: string;
@@ -7,9 +9,11 @@ interface PoiDetailProps {
 }
 
 export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
-  const [poi, setPoi] = useState<any>(null);
-  const [trips, setTrips] = useState<any[]>([]);
+  const [poi, setPoi] = useState<POI | null>(null);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+
+  const selectedTripId = useMapStore((s) => s.selectedTripId);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,11 +35,20 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
 
   if (!poi) return <div className="p-5 text-neutral-500">加载中...</div>;
 
-  const handleChange = async (field: string, value: any) => {
+  const handleChange = (field: string, value: any) => {
     const updated = { ...poi, [field]: value };
     setPoi(updated);
-    await db.updatePoi(updated);
-    window.dispatchEvent(new Event('poi-added')); // Refresh map markers
+    
+    // Debounce the DB write
+    if ((window as any)._poiSaveTimer) clearTimeout((window as any)._poiSaveTimer);
+    (window as any)._poiSaveTimer = setTimeout(async () => {
+      try {
+        await db.updatePoi(updated);
+        window.dispatchEvent(new Event('poi-added')); // Refresh map markers
+      } catch (err) {
+        console.error("POI save failed:", err);
+      }
+    }, 500);
   };
 
   return (
@@ -43,18 +56,42 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
       <div className="p-5 space-y-5 animate-fade-in-up">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold text-white">{poi.name}</h2>
-          <button 
-            onClick={async () => {
-              if (confirm("确定删除此地点吗？")) {
-                await db.deletePoi(poiId);
-                window.dispatchEvent(new Event('poi-added'));
-                onBack();
-              }
-            }}
-            className="text-xs text-red-500 hover:text-red-400"
-          >
-            删除
-          </button>
+          <div className="flex items-center gap-2">
+            {selectedTripId && !trips.find(t => t.trip_id === selectedTripId) && (
+              <button 
+                onClick={async () => {
+                  try {
+                    await db.addPoiToTrip(selectedTripId, poiId);
+                    const nextTrips = await db.getTripsForPoi(poiId);
+                    setTrips(nextTrips);
+                    window.dispatchEvent(new Event('poi-added'));
+                  } catch (err) {
+                    console.error("Failed to add POI to trip:", err);
+                  }
+                }}
+                className="text-xs text-[var(--color-accent)] hover:text-blue-400"
+              >
+                + 添加到当前行程
+              </button>
+            )}
+            <button 
+              onClick={async () => {
+                if (confirm("确定删除此地点吗？")) {
+                  try {
+                    await db.deletePoi(poiId);
+                    window.dispatchEvent(new Event('poi-added'));
+                    onBack();
+                  } catch (err) {
+                    console.error("Failed to delete POI:", err);
+                    alert("删除失败");
+                  }
+                }
+              }}
+              className="text-xs text-red-500 hover:text-red-400"
+            >
+              删除
+            </button>
+          </div>
         </div>
 
         <div>
@@ -82,14 +119,19 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
           <div className="flex justify-between items-center mb-2">
             <div className="text-[11px] text-neutral-500">标签</div>
             <button 
-              onClick={async () => {
-                const tag = prompt("输入新标签:");
-                if (tag) {
-                  await db.addTag("poi", poiId, tag);
-                  const nextTags = await db.getTags("poi", poiId);
-                  setTags(nextTags);
-                }
-              }}
+                onClick={async () => {
+                  const tag = prompt("输入新标签:");
+                  if (tag) {
+                    try {
+                      await db.addTag("poi", poiId, tag);
+                      const nextTags = await db.getTags("poi", poiId);
+                      setTags(nextTags);
+                    } catch (err) {
+                      console.error("Failed to add tag:", err);
+                      alert("添加标签失败");
+                    }
+                  }
+                }}
               className="text-[10px] text-[var(--color-accent)] hover:text-white"
             >
               + 添加
@@ -104,9 +146,16 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
                 #{t}
                 <button 
                   onClick={async () => {
-                    await db.removeTag("poi", poiId, t);
-                    const nextTags = await db.getTags("poi", poiId);
-                    setTags(nextTags);
+                    if (confirm(`删除标签 #${t}?`)) {
+                      try {
+                        await db.removeTag("poi", poiId, t);
+                        const nextTags = await db.getTags("poi", poiId);
+                        setTags(nextTags);
+                      } catch (err) {
+                        console.error("Failed to delete tag:", err);
+                        alert("删除标签失败");
+                      }
+                    }
                   }}
                   className="ml-1 hidden text-red-400 hover:text-red-300 group-hover:inline-block"
                 >

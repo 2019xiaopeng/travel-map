@@ -18,6 +18,8 @@ interface Window {
       deletePoi: (payload: { poiId: string }) => Promise<any>;
 
       getPoisForTrip: (payload: { tripId: string }) => Promise<any>;
+      addPoiToTrip: (payload: { tripId: string; poiId: string }) => Promise<any>;
+      removePoiFromTrip: (payload: { tripId: string; poiId: string }) => Promise<any>;
       getTripsForPoi: (payload: { poiId: string }) => Promise<any>;
 
       getTripCosts: (payload: { tripId: string }) => Promise<any>;

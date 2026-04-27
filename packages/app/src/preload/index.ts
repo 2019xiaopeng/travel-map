@@ -20,6 +20,8 @@ const api = {
     deletePoi: (payload: { poiId: string }) => ipcRenderer.invoke("db:deletePoi", payload),
 
     getPoisForTrip: (payload: { tripId: string }) => ipcRenderer.invoke("db:getPoisForTrip", payload),
+    addPoiToTrip: (payload: { tripId: string; poiId: string }) => ipcRenderer.invoke("db:addPoiToTrip", payload),
+    removePoiFromTrip: (payload: { tripId: string; poiId: string }) => ipcRenderer.invoke("db:removePoiFromTrip", payload),
     getTripsForPoi: (payload: { poiId: string }) => ipcRenderer.invoke("db:getTripsForPoi", payload),
 
     getTripCosts: (payload: { tripId: string }) => ipcRenderer.invoke("db:getTripCosts", payload),

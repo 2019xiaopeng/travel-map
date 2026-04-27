@@ -4,8 +4,9 @@ import MdEditor from 'react-markdown-editor-lite';
 import MarkdownIt from 'markdown-it';
 import 'react-markdown-editor-lite/lib/index.css';
 import { useMapStore } from "../../features/map/mapStore";
+import { Trip, TripCost, POI, Asset, Tag } from "../../types";
 
-const mdParser = new MarkdownIt();
+const mdParser = new MarkdownIt({ html: false });
 
 interface TripDetailProps {
   tripId: string;
@@ -13,18 +14,18 @@ interface TripDetailProps {
 }
 
 export function TripDetail({ tripId, onBack }: TripDetailProps) {
-  const [trip, setTrip] = useState<any>(null);
+  const [trip, setTrip] = useState<Trip | null>(null);
   const [activeTab, setActiveTab] = useState<"content" | "attachment" | "pois" | "costs">("content");
-  const [costs, setCosts] = useState<any[]>([]);
+  const [costs, setCosts] = useState<TripCost[]>([]);
   const [tags, setTags] = useState<string[]>([]);
-  const [pois, setPois] = useState<any[]>([]);
-  const [attachments, setAttachments] = useState<any[]>([]);
+  const [pois, setPois] = useState<POI[]>([]);
+  const [attachments, setAttachments] = useState<Asset[]>([]);
   const cityId = useMapStore((s) => s.cityId);
   const cityName = useMapStore((s) => s.cityName);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const loadData = async () => {
       try {
         const t = await db.getTrip(tripId);
         if (cancelled) return;
@@ -43,9 +44,20 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
       } catch {
         if (!cancelled) setTrip(null);
       }
-    })();
+    };
+
+    loadData();
+
+    const onPoiUpdate = () => {
+      db.getPoisForTrip(tripId).then(nextPois => {
+        if (!cancelled) setPois(nextPois);
+      });
+    };
+    window.addEventListener('poi-added', onPoiUpdate);
+
     return () => {
       cancelled = true;
+      window.removeEventListener('poi-added', onPoiUpdate);
     };
   }, [tripId]);
 
@@ -54,7 +66,13 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
   const handleChange = (field: string, value: any) => {
     const updated = { ...trip, [field]: value };
     setTrip(updated);
-    db.updateTrip(updated).catch(() => {});
+    
+    // Debounce the DB write
+    if ((window as any)._tripSaveTimer) clearTimeout((window as any)._tripSaveTimer);
+    (window as any)._tripSaveTimer = setTimeout(() => {
+      db.updateTrip(updated).catch((err) => console.error("Trip save failed:", err));
+      window.dispatchEvent(new Event('poi-added')); // Refresh map in case date or title changed
+    }, 500);
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
@@ -178,9 +196,14 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                 onClick={async () => {
                   const tag = prompt("输入新标签:");
                   if (tag) {
-                    await db.addTag("trip", tripId, tag);
-                    const nextTags = await db.getTags("trip", tripId);
-                    setTags(nextTags);
+                    try {
+                      await db.addTag("trip", tripId, tag);
+                      const nextTags = await db.getTags("trip", tripId);
+                      setTags(nextTags);
+                    } catch (err) {
+                      console.error("Failed to add tag:", err);
+                      alert("添加标签失败");
+                    }
                   }
                 }}
                 className="text-[10px] text-[var(--color-accent)] hover:text-white"
@@ -197,9 +220,16 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                   #{t}
                   <button 
                     onClick={async () => {
-                      await db.removeTag("trip", tripId, t);
-                      const nextTags = await db.getTags("trip", tripId);
-                      setTags(nextTags);
+                      if (confirm(`删除标签 #${t}?`)) {
+                        try {
+                          await db.removeTag("trip", tripId, t);
+                          const nextTags = await db.getTags("trip", tripId);
+                          setTags(nextTags);
+                        } catch (err) {
+                          console.error("Failed to delete tag:", err);
+                          alert("删除标签失败");
+                        }
+                      }
                     }}
                     className="ml-1 hidden text-red-400 hover:text-red-300 group-hover:inline-block"
                   >
@@ -248,14 +278,34 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                 {pois.length > 0 ? (
                   <ul className="space-y-2">
                     {pois.map((p, idx) => (
-                      <li key={p.poi_id} className="flex items-center justify-between text-xs bg-[var(--color-surface-elevated)] p-2 rounded border border-[var(--color-border)]">
+                      <li key={p.poi_id} className="flex items-center justify-between text-xs bg-[var(--color-surface-elevated)] p-2 rounded border border-[var(--color-border)] group">
                         <div className="flex items-center gap-2">
                           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-accent)] text-[10px] text-white">
                             {idx + 1}
                           </span>
                           <span className="text-white">{p.name}</span>
                         </div>
-                        <span className="text-neutral-500 text-[10px]">{p.category}</span>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-neutral-500 text-[10px]">{p.category}</span>
+                          <button 
+                            onClick={async () => {
+                              if (confirm(`从旅行中移除地点 ${p.name}？(不会删除地点本身)`)) {
+                                try {
+                                  await db.removePoiFromTrip(tripId, p.poi_id);
+                                  const nextPois = await db.getPoisForTrip(tripId);
+                                  setPois(nextPois);
+                                  window.dispatchEvent(new Event('poi-added'));
+                                } catch (err) {
+                                  console.error("Failed to remove POI from trip:", err);
+                                }
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-400 px-1"
+                            title="从行程移除"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -277,11 +327,16 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                       const category = prompt("输入花费类别(如: 交通, 住宿):");
                       const amount = prompt("输入花费金额:");
                       if (category && amount && !isNaN(Number(amount))) {
-                        await db.updateTripCost(tripId, category, Number(amount));
-                        const t = await db.getTrip(tripId);
-                        const nextCosts = await db.getTripCosts(tripId);
-                        setTrip(t);
-                        setCosts(nextCosts);
+                        try {
+                          await db.updateTripCost(tripId, category, Number(amount));
+                          const t = await db.getTrip(tripId);
+                          const nextCosts = await db.getTripCosts(tripId);
+                          setTrip(t);
+                          setCosts(nextCosts);
+                        } catch (err) {
+                          console.error("Failed to add trip cost:", err);
+                          alert("添加花费失败");
+                        }
                       }
                     }}
                     className="text-xs text-[var(--color-accent)] hover:text-white"
@@ -298,14 +353,19 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                           <span className="text-[var(--color-accent)] font-medium">¥{c.amount}</span>
                           <button 
                             onClick={async () => {
-                              if (confirm(`删除 ${c.category} 的花费记录？`)) {
+                            if (confirm(`删除 ${c.category} 的花费记录？`)) {
+                              try {
                                 await db.deleteTripCost(tripId, c.category);
                                 const t = await db.getTrip(tripId);
                                 const nextCosts = await db.getTripCosts(tripId);
                                 setTrip(t);
                                 setCosts(nextCosts);
+                              } catch (err) {
+                                console.error("Failed to delete trip cost:", err);
+                                alert("删除花费失败");
                               }
-                            }}
+                            }
+                          }}
                             className="text-red-500 hover:text-red-400"
                           >
                             ×

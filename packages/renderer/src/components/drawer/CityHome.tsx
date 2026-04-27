@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "../../services/db";
+import { City } from "../../types";
 
 interface CityHomeProps {
   cityId: string;
@@ -9,20 +10,25 @@ interface CityHomeProps {
 }
 
 export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHomeProps) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<City | null>(null);
   const [summary, setSummary] = useState<string>("");
 
   useEffect(() => {
     let active = true;
-    db.getCity(cityId, provinceId, cityName, provinceName).then((res) => {
-      if (!active) return;
-      setData(res);
-      setSummary(res?.summary || "");
-    });
+    db.getCity(cityId, provinceId, cityName, provinceName)
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setSummary(res?.summary || "");
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load city:", err);
+      });
     return () => {
       active = false;
     };
-  }, [cityId, cityName, provinceId, provinceName]);
+  }, [cityId, provinceId, cityName, provinceName]);
 
   if (!data) {
     return (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "../../services/db";
+import { Trip } from "../../types";
 
 interface TripListProps {
   cityId: string;
@@ -7,11 +8,15 @@ interface TripListProps {
 }
 
 export function TripList({ cityId, onSelectTrip }: TripListProps) {
-  const [trips, setTrips] = useState<any[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
 
   const loadTrips = async () => {
-    const res = await db.getTrips(cityId);
-    setTrips(res);
+    try {
+      const res = await db.getTrips(cityId);
+      setTrips(res);
+    } catch (err) {
+      console.error("Failed to load trips:", err);
+    }
   };
 
   useEffect(() => {
@@ -19,8 +24,12 @@ export function TripList({ cityId, onSelectTrip }: TripListProps) {
   }, [cityId]);
 
   const handleCreate = async () => {
-    const newTripId = await db.createTrip({ city_id: cityId });
-    onSelectTrip(newTripId);
+    try {
+      const newTripId = await db.createTrip({ city_id: cityId });
+      onSelectTrip(newTripId);
+    } catch (err) {
+      console.error("Failed to create trip:", err);
+    }
   };
 
   return (
