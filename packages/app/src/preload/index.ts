@@ -46,6 +46,7 @@ const api = {
       ipcRenderer.invoke("file:saveAsset", { sourcePath, destRelativeDir }),
     saveAssetBytes: (bytes: ArrayBuffer, originalFilename: string, mime: string, destRelativeDir: string) =>
       ipcRenderer.invoke("file:saveAssetBytes", { bytes, originalFilename, mime, destRelativeDir }),
+    exportBackupZip: () => ipcRenderer.invoke("file:exportBackupZip"),
     openLocal: (localPath: string) => ipcRenderer.invoke("file:openLocal", { localPath }),
   }
 };

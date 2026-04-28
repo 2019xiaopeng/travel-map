@@ -5,6 +5,7 @@ import path from "path";
 import crypto from "crypto";
 import { app } from "electron";
 import { saveAssetBytesCore } from "./saveAssetBytesCore";
+import { createBackupZip } from "./backupZip";
 
 export function setupIpc() {
   const assertSender = (event: Electron.IpcMainInvokeEvent) => {
@@ -607,6 +608,60 @@ export function setupIpc() {
       }
     },
   );
+
+  ipcMain.handle("file:exportBackupZip", async (event) => {
+    assertSender(event);
+    const userDataPath = app.getPath("userData");
+    const db = getDb();
+
+    const now = Date.now();
+    const defaultName = `travel-map-backup-${now}.zip`;
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "导出备份（zip）",
+      defaultPath: path.join(userDataPath, defaultName),
+      filters: [{ name: "Zip", extensions: ["zip"] }],
+    });
+    if (canceled || !filePath) return { canceled: true };
+
+    const snapshotPath = path.join(userDataPath, `travel-map.sqlite.export-${now}`);
+    try {
+      const backupFn = (db as any).backup?.bind(db);
+      if (typeof backupFn !== "function") {
+        return { error: "DB backup not supported" };
+      }
+      await backupFn(snapshotPath);
+
+      const assets = db
+        .prepare(`SELECT asset_id, sha256, local_path, size, remote_url FROM Asset`)
+        .all() as any[];
+
+      await createBackupZip({
+        zipPath: filePath,
+        userDataPath,
+        dbSnapshotPath: snapshotPath,
+        appVersion: app.getVersion(),
+        exportedAt: now,
+        assets: assets.map((a) => ({
+          asset_id: String(a.asset_id),
+          sha256: String(a.sha256),
+          local_path: String(a.local_path),
+          size: Number(a.size),
+          remote_url: a.remote_url ? String(a.remote_url) : null,
+        })),
+      });
+
+      return { ok: true, path: filePath };
+    } catch (e: any) {
+      console.error("Export backup failed:", e);
+      return { error: e.message };
+    } finally {
+      try {
+        await fs.promises.unlink(snapshotPath);
+      } catch (err: any) {
+        if (err?.code !== "ENOENT") console.error("Cleanup snapshot failed:", err);
+      }
+    }
+  });
 
   ipcMain.handle("file:openLocal", async (event, payload: { localPath: string }) => {
     assertSender(event);

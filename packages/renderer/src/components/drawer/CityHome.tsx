@@ -118,6 +118,28 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
         <StatCard label="POI 收藏" value={data?.poiCount?.toString() || "0"} />
         <StatCard label="总花费" value={data?.totalCost ? `¥${data.totalCost}` : "—"} />
       </div>
+
+      <div className="pt-2">
+        <button
+          onClick={async () => {
+            try {
+              const res = await window.travelMap.file.exportBackupZip();
+              if (res?.canceled) return;
+              if (res?.ok && res.path) {
+                alert(`备份已导出：${res.path}`);
+              } else {
+                alert(res?.error || "导出失败");
+              }
+            } catch (err: any) {
+              console.error("导出备份失败", err);
+              alert("导出失败");
+            }
+          }}
+          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 py-2 text-sm font-medium text-white hover:bg-[var(--color-surface-elevated)]"
+        >
+          导出备份（zip）
+        </button>
+      </div>
     </div>
   );
 }
