@@ -5,6 +5,7 @@ import MarkdownIt from 'markdown-it';
 import 'react-markdown-editor-lite/lib/index.css';
 import { useMapStore } from "../../features/map/mapStore";
 import { Trip, TripCost, POI, Asset, Tag } from "../../types";
+import { extractFilePaths } from "../../utils/fileDrop";
 
 const mdParser = new MarkdownIt({ html: false });
 
@@ -45,6 +46,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
   const [tags, setTags] = useState<string[]>([]);
   const [pois, setPois] = useState<POI[]>([]);
   const [attachments, setAttachments] = useState<Asset[]>([]);
+  const [attachmentDropping, setAttachmentDropping] = useState(false);
   const cityId = useMapStore((s) => s.cityId);
   const cityName = useMapStore((s) => s.cityName);
 
@@ -148,6 +150,23 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
       }
     };
     input.click();
+  };
+
+  const uploadAttachments = async (paths: string[]) => {
+    if (!cityId || !cityName) return;
+    for (const p of paths) {
+      try {
+        const destDir = `cities/${cityId}-${cityName}/trips/${tripId}/docs`;
+        const res = await window.travelMap.file.saveAsset(p, destDir);
+        if (res.assetId) {
+          await db.addTag("trip_attachment", tripId, res.assetId);
+        }
+      } catch (err) {
+        console.error("上传附件失败", err);
+      }
+    }
+    const nextAttachments = await db.getTripAttachments(tripId);
+    setAttachments(nextAttachments);
   };
 
   return (
@@ -418,7 +437,33 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
             )}
 
             {activeTab === "attachment" && (
-              <div className="p-4 h-full animate-fade-in-up">
+              <div
+                className={`p-4 h-full animate-fade-in-up ${attachmentDropping ? "ring-2 ring-[var(--color-accent)]/60 rounded-lg" : ""}`}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setAttachmentDropping(true);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setAttachmentDropping(false);
+                }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setAttachmentDropping(false);
+                  const paths = extractFilePaths(Array.from(e.dataTransfer?.files ?? []) as any);
+                  if (paths.length > 0) {
+                    await uploadAttachments(paths);
+                    alert("附件上传完成");
+                  }
+                }}
+              >
                 <div className="mb-4 flex items-center justify-between">
                   <h4 className="text-sm font-medium text-white">所有附件</h4>
                   <button 
@@ -428,22 +473,8 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                       input.multiple = true;
                       input.onchange = async (e: any) => {
                         const files = Array.from(e.target.files || []);
-                        for (const file of files) {
-                          const path = (file as any).path;
-                          if (path && cityId && cityName) {
-                            const destDir = `cities/${cityId}-${cityName}/trips/${tripId}/attachments`;
-                            try {
-                              const res = await window.travelMap.file.saveAsset(path, destDir);
-                              if (res.assetId) {
-                                await db.addTag("trip_attachment", tripId, res.assetId);
-                              }
-                            } catch(err) {
-                              console.error("上传附件失败", err);
-                            }
-                          }
-                        }
-                        const nextAttachments = await db.getTripAttachments(tripId);
-                        setAttachments(nextAttachments);
+                        const paths = extractFilePaths(files as any);
+                        await uploadAttachments(paths);
                         alert("附件上传完成");
                       };
                       input.click();
@@ -453,6 +484,11 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                     + 上传附件
                   </button>
                 </div>
+                {attachmentDropping && (
+                  <div className="mb-4 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40 p-4 text-center text-xs text-neutral-300">
+                    松开鼠标上传附件
+                  </div>
+                )}
                 {attachments.length > 0 ? (
                   <ul className="space-y-2">
                     {attachments.map((a: any) => (
