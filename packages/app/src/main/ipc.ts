@@ -512,15 +512,17 @@ export function setupIpc() {
             }
           }
           if (existing?.asset_id && existing?.local_path) {
-            return { assetId: existing.asset_id, localUrl: `local:///${existing.local_path}` };
+            const suffix = existing.local_path.startsWith("assets/") ? existing.local_path.slice("assets/".length) : existing.local_path;
+            return { assetId: existing.asset_id, localUrl: `local://assets/${suffix}` };
           }
         }
         throw e;
       }
 
+      const suffix = destRelativePath.startsWith("assets/") ? destRelativePath.slice("assets/".length) : destRelativePath;
       return {
         assetId,
-        localUrl: `local:///${destRelativePath}`
+        localUrl: `local://assets/${suffix}`
       };
     } catch (e: any) {
       if (absoluteDestPath) {

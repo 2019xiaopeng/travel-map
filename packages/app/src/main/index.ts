@@ -68,7 +68,9 @@ app.whenReady().then(() => {
   protocol.handle('local', async (request) => {
     try {
       const url = new URL(request.url);
-      const relativePath = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+      const hostPart = url.host ? `${url.host}/` : "";
+      const pathPart = url.pathname.replace(/^\/+/, "");
+      const relativePath = decodeURIComponent(`${hostPart}${pathPart}`);
       const userDataPath = app.getPath('userData');
       const absolutePath = resolve(join(userDataPath, relativePath));
       const assetsRoot = resolve(join(userDataPath, 'assets'));

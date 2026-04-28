@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { db } from "../../../services/db";
 import { useMapStore } from "../mapStore";
+import { gcj02ToWgs84 } from "../../../utils/coord";
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -15,6 +16,8 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
   const selectedTripId = useMapStore(s => s.selectedTripId);
+  const addingPoi = useMapStore(s => s.addingPoi);
+  const openPoiDraft = useMapStore(s => s.openPoiDraft);
 
   useEffect(() => {
     if (!map || !cityId) return;
@@ -128,34 +131,22 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
     const onPoiUpdate = () => loadPois();
     window.addEventListener('poi-added', onPoiUpdate);
 
-    const handleRightClick = async (e: any) => {
-      const name = prompt("输入 POI 名称:");
-      if (name) {
-        try {
-          const lnglat = e.lnglat;
-          await db.createPoi({
-            city_id: cityId,
-            trip_id: selectedTripId,
-            name,
-            lng: lnglat.getLng(),
-            lat: lnglat.getLat(),
-            gcj02_lng: lnglat.getLng(),
-            gcj02_lat: lnglat.getLat(),
-          });
-          window.dispatchEvent(new Event('poi-added'));
-        } catch (err) {
-          console.error("Failed to create POI:", err);
-          alert("添加失败");
-        }
-      }
+    const handleClick = (e: any) => {
+      if (!useMapStore.getState().addingPoi) return;
+      const lnglat = e?.lnglat;
+      if (!lnglat) return;
+      const gcjLng = lnglat.getLng();
+      const gcjLat = lnglat.getLat();
+      const wgs = gcj02ToWgs84(gcjLng, gcjLat);
+      openPoiDraft({ lng: wgs.lng, lat: wgs.lat, gcj02_lng: gcjLng, gcj02_lat: gcjLat });
     };
 
-    map.on('rightclick', handleRightClick);
+    map.on('click', handleClick);
 
     return () => {
       cancelled = true;
       window.removeEventListener('poi-added', onPoiUpdate);
-      map.off('rightclick', handleRightClick);
+      map.off('click', handleClick);
       markersRef.current.forEach((m) => {
         m.off('click');
         m.setMap(null);
@@ -166,7 +157,7 @@ export function PoiLayer({ map, cityId }: { map: any; cityId: string | null }) {
         polylineRef.current = null;
       }
     };
-  }, [map, cityId, selectedTripId]);
+  }, [map, cityId, selectedTripId, addingPoi, openPoiDraft]);
 
   return null;
 }

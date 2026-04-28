@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { db } from "../../services/db";
 import { POI, Trip } from "../../types";
 import { useMapStore } from "../../features/map/mapStore";
+import { wgs84ToGcj02 } from "../../utils/coord";
 
 interface PoiDetailProps {
   poiId: string;
@@ -44,19 +45,22 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
   if (loadError) return <div className="p-5 text-neutral-500">{loadError}</div>;
   if (!poi) return <div className="p-5 text-neutral-500">加载中...</div>;
 
-  const handleChange = (field: string, value: any) => {
-    const updated = { ...poi, [field]: value };
+  const scheduleSave = (updated: POI) => {
     setPoi(updated);
     
     if ((window as any)._poiSaveTimer) clearTimeout((window as any)._poiSaveTimer);
     (window as any)._poiSaveTimer = setTimeout(async () => {
       try {
         await db.updatePoi(updated);
-        window.dispatchEvent(new Event('poi-added')); // Refresh map markers
+        window.dispatchEvent(new Event('poi-added'));
       } catch (err) {
         console.error("POI save failed:", err);
       }
     }, 500);
+  };
+
+  const handleChange = (field: string, value: any) => {
+    scheduleSave({ ...poi, [field]: value });
   };
 
   return (
@@ -121,6 +125,43 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
             className="w-full h-24 resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--color-accent)]"
             placeholder="写点关于这个地点的备注..."
           />
+        </div>
+
+        <div className="pt-2 border-t border-[var(--color-border)]">
+          <div className="text-[11px] text-neutral-500 mb-2">坐标（WGS84，可编辑）</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="mb-1 text-[11px] text-neutral-600">经度</div>
+              <input
+                type="number"
+                value={poi.lng}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (Number.isNaN(next)) return;
+                  const gcj = wgs84ToGcj02(next, poi.lat);
+                  scheduleSave({ ...poi, lng: next, gcj02_lng: gcj.lng, gcj02_lat: gcj.lat });
+                }}
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--color-accent)]"
+              />
+            </div>
+            <div>
+              <div className="mb-1 text-[11px] text-neutral-600">纬度</div>
+              <input
+                type="number"
+                value={poi.lat}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (Number.isNaN(next)) return;
+                  const gcj = wgs84ToGcj02(poi.lng, next);
+                  scheduleSave({ ...poi, lat: next, gcj02_lng: gcj.lng, gcj02_lat: gcj.lat });
+                }}
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--color-accent)]"
+              />
+            </div>
+          </div>
+          <div className="mt-2 text-[11px] text-neutral-600">
+            GCJ02：{poi.gcj02_lng.toFixed(6)},{poi.gcj02_lat.toFixed(6)}
+          </div>
         </div>
 
         <div className="pt-2 border-t border-[var(--color-border)]">

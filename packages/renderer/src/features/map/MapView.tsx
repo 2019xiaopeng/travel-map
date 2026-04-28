@@ -5,6 +5,7 @@ import { ProvinceLayer } from "./layers/ProvinceLayer";
 import { CityLayer } from "./layers/CityLayer";
 import { PoiLayer } from "./layers/PoiLayer";
 import { BreadCrumbOverlay } from "./BreadCrumbOverlay";
+import { PoiAddModal } from "./PoiAddModal";
 
 export function MapView() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -14,6 +15,8 @@ export function MapView() {
   const level = useMapStore((s) => s.level);
   const provinceId = useMapStore((s) => s.provinceId);
   const cityId = useMapStore((s) => s.cityId);
+  const addingPoi = useMapStore((s) => s.addingPoi);
+  const poiDraft = useMapStore((s) => s.poiDraft);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -89,6 +92,14 @@ export function MapView() {
       )}
 
       <BreadCrumbOverlay />
+
+      {level === "city" && addingPoi && !poiDraft && (
+        <div className="absolute left-4 top-14 z-20 rounded-md border border-[var(--color-border)] bg-black/70 px-3 py-2 text-xs text-neutral-200 backdrop-blur">
+          点击地图选择落点
+        </div>
+      )}
+
+      <PoiAddModal />
     </div>
   );
 }

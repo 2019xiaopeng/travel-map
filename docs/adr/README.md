@@ -12,3 +12,5 @@
 - [ADR-0008 资产引用关系与垃圾回收（GC）](file:///workspace/docs/adr/ADR-0008-asset-references-and-gc.md)
 - [ADR-0009 工具链一致性（TypeScript 版本与 pnpm 构建脚本）](file:///workspace/docs/adr/ADR-0009-toolchain-consistency.md)
 - [ADR-0010 封面替换时回收旧资源](file:///workspace/docs/adr/ADR-0010-cover-replacement-gc.md)
+- [ADR-0011 POI 点选添加流程与坐标约定对齐](file:///workspace/docs/adr/ADR-0011-poi-add-flow-and-coordinates.md)
+- [ADR-0012 local:// URL 结构与文档对齐（兼容双格式）](file:///workspace/docs/adr/ADR-0012-local-url-format-alignment.md)

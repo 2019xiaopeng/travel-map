@@ -10,13 +10,27 @@ const mdParser = new MarkdownIt({ html: false });
 
 function extractAssetIdsFromMarkdown(markdown: string) {
   const ids = new Set<string>();
-  const re = /local:\/\/\/assets\/[^)\s]*?\/([0-9a-fA-F-]{36})__[^)\s]+/g;
+  const re = /local:\/\/(?:assets\/|\/assets\/)[^)\s]*?\/([0-9a-fA-F-]{36})__[^)\s]+/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(markdown))) {
     const assetId = String(m[1] ?? "").trim();
     if (assetId) ids.add(assetId);
   }
   return Array.from(ids);
+}
+
+function localPathToLocalUrl(localPath: string) {
+  const normalized = String(localPath ?? "");
+  if (normalized.startsWith("assets/")) return `local://assets/${normalized.slice("assets/".length)}`;
+  return `local:///${normalized.replace(/^\/+/, "")}`;
+}
+
+function localUrlToLocalPath(localUrl: string) {
+  const normalized = String(localUrl ?? "");
+  if (normalized.startsWith("local://assets/")) return `assets/${normalized.slice("local://assets/".length)}`;
+  if (normalized.startsWith("local:///")) return normalized.slice("local:///".length);
+  if (normalized.startsWith("local://")) return normalized.slice("local://".length);
+  return normalized;
 }
 
 interface TripDetailProps {
@@ -97,7 +111,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
 
         window.travelMap.file.saveAsset(path, destDir).then(res => {
           if (res.localUrl) {
-            resolve(`local:///${res.localUrl.replace('local:///', '')}`);
+            resolve(res.localUrl);
           } else {
             resolve(URL.createObjectURL(file)); // fallback
           }
@@ -125,7 +139,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
       try {
         const res = await window.travelMap.file.saveAsset(path, destDir);
         if (res.assetId && res.localUrl) {
-          const updated = { ...trip, cover_asset_id: res.assetId, cover_path: res.localUrl.replace('local:///', '') };
+          const updated = { ...trip, cover_asset_id: res.assetId, cover_path: localUrlToLocalPath(res.localUrl) };
           setTrip(updated);
           await db.updateTrip(updated);
         }
@@ -145,7 +159,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
       >
         {trip.cover_path || trip.cover_remote ? (
           <img 
-            src={trip.cover_remote || `local:///${trip.cover_path}`} 
+            src={trip.cover_remote || (trip.cover_path ? localPathToLocalUrl(trip.cover_path) : "")} 
             alt="Trip Cover" 
             className="w-full h-full object-cover transition-transform group-hover:scale-105" 
           />

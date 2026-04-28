@@ -11,6 +11,8 @@ interface MapState {
   drawerOpen: boolean;
   selectedPoiId: string | null;
   selectedTripId: string | null;
+  addingPoi: boolean;
+  poiDraft: { lng: number; lat: number; gcj02_lng: number; gcj02_lat: number } | null;
 
   enterProvince: (id: string, name: string) => void;
   enterCity: (id: string, name: string) => void;
@@ -19,6 +21,10 @@ interface MapState {
   setDrawerOpen: (open: boolean) => void;
   selectPoi: (poiId: string | null) => void;
   selectTrip: (tripId: string | null) => void;
+  startAddPoi: () => void;
+  cancelAddPoi: () => void;
+  openPoiDraft: (draft: { lng: number; lat: number; gcj02_lng: number; gcj02_lat: number }) => void;
+  closePoiDraft: () => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -30,6 +36,8 @@ export const useMapStore = create<MapState>((set) => ({
   drawerOpen: false,
   selectedPoiId: null,
   selectedTripId: null,
+  addingPoi: false,
+  poiDraft: null,
 
   enterProvince: (id, name) =>
     set({
@@ -41,6 +49,8 @@ export const useMapStore = create<MapState>((set) => ({
       drawerOpen: false,
       selectedPoiId: null,
       selectedTripId: null,
+      addingPoi: false,
+      poiDraft: null,
     }),
 
   enterCity: (id, name) =>
@@ -51,6 +61,8 @@ export const useMapStore = create<MapState>((set) => ({
       drawerOpen: true,
       selectedPoiId: null,
       selectedTripId: null,
+      addingPoi: false,
+      poiDraft: null,
     }),
 
   backToCountry: () =>
@@ -63,6 +75,8 @@ export const useMapStore = create<MapState>((set) => ({
       drawerOpen: false,
       selectedPoiId: null,
       selectedTripId: null,
+      addingPoi: false,
+      poiDraft: null,
     }),
 
   backToProvince: () =>
@@ -73,9 +87,15 @@ export const useMapStore = create<MapState>((set) => ({
       drawerOpen: false,
       selectedPoiId: null,
       selectedTripId: null,
+      addingPoi: false,
+      poiDraft: null,
     }),
 
   setDrawerOpen: (open) => set({ drawerOpen: open }),
   selectPoi: (poiId) => set({ selectedPoiId: poiId, drawerOpen: true }),
   selectTrip: (tripId) => set({ selectedTripId: tripId }),
+  startAddPoi: () => set({ addingPoi: true, poiDraft: null }),
+  cancelAddPoi: () => set({ addingPoi: false, poiDraft: null }),
+  openPoiDraft: (draft) => set({ poiDraft: draft, addingPoi: false }),
+  closePoiDraft: () => set({ poiDraft: null }),
 }));

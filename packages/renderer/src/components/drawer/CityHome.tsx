@@ -78,7 +78,7 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
       >
         {data.cover_path || data.cover_remote ? (
           <img
-            src={data.cover_remote || `local:///${data.cover_path}`}
+            src={data.cover_remote || (data.cover_path ? (data.cover_path.startsWith("assets/") ? `local://assets/${data.cover_path.slice("assets/".length)}` : `local:///${data.cover_path}`) : "")}
             alt="City Cover"
             className="w-full h-full object-cover transition-transform group-hover:scale-105"
           />
