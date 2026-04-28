@@ -142,6 +142,31 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
           导出备份（zip）
         </button>
       </div>
+
+      <div className="pt-2">
+        <button
+          onClick={async () => {
+            try {
+              const res = await window.travelMap.file.importBackupZip();
+              if (res?.canceled) return;
+              if (!res?.ok) {
+                alert(res?.error || "导入失败");
+                return;
+              }
+              const ok = confirm("备份已导入，重启后将替换当前数据。是否立即重启？");
+              if (ok) {
+                await window.travelMap.app.relaunch();
+              }
+            } catch (err: any) {
+              console.error("导入备份失败", err);
+              alert("导入失败");
+            }
+          }}
+          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 py-2 text-sm font-medium text-white hover:bg-[var(--color-surface-elevated)]"
+        >
+          导入备份（zip）
+        </button>
+      </div>
     </div>
   );
 }

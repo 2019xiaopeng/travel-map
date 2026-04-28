@@ -6,6 +6,7 @@ import crypto from "crypto";
 import { app } from "electron";
 import { saveAssetBytesCore } from "./saveAssetBytesCore";
 import { createBackupZip } from "./backupZip";
+import { stageRestoreFromZip } from "./backupRestore";
 
 export function setupIpc() {
   const assertSender = (event: Electron.IpcMainInvokeEvent) => {
@@ -661,6 +662,33 @@ export function setupIpc() {
         if (err?.code !== "ENOENT") console.error("Cleanup snapshot failed:", err);
       }
     }
+  });
+
+  ipcMain.handle("file:importBackupZip", async (event) => {
+    assertSender(event);
+    const userDataPath = app.getPath("userData");
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: "导入备份（zip）",
+      properties: ["openFile"],
+      filters: [{ name: "Zip", extensions: ["zip"] }],
+    });
+    if (canceled || filePaths.length === 0) return { canceled: true };
+
+    try {
+      const now = Date.now();
+      const res = await stageRestoreFromZip({ zipPath: filePaths[0], userDataPath, now });
+      return { ok: true, stagingPath: res.stagingPath, needsRestart: true };
+    } catch (e: any) {
+      console.error("Import backup failed:", e);
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle("app:relaunch", async (event) => {
+    assertSender(event);
+    app.relaunch();
+    app.exit(0);
+    return { ok: true };
   });
 
   ipcMain.handle("file:openLocal", async (event, payload: { localPath: string }) => {

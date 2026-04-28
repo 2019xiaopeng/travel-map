@@ -3,6 +3,9 @@ import { is } from "@electron-toolkit/utils";
 
 const api = {
   isDev: is.dev,
+  app: {
+    relaunch: () => ipcRenderer.invoke("app:relaunch"),
+  },
   db: {
     getCity: (payload: { cityId: string; provinceId: string; cityName: string; provinceName: string }) =>
       ipcRenderer.invoke("db:getCity", payload),
@@ -47,6 +50,7 @@ const api = {
     saveAssetBytes: (bytes: ArrayBuffer, originalFilename: string, mime: string, destRelativeDir: string) =>
       ipcRenderer.invoke("file:saveAssetBytes", { bytes, originalFilename, mime, destRelativeDir }),
     exportBackupZip: () => ipcRenderer.invoke("file:exportBackupZip"),
+    importBackupZip: () => ipcRenderer.invoke("file:importBackupZip"),
     openLocal: (localPath: string) => ipcRenderer.invoke("file:openLocal", { localPath }),
   }
 };

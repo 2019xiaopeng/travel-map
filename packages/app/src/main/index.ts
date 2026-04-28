@@ -4,6 +4,7 @@ import { is } from "@electron-toolkit/utils";
 import { initDb, getDb } from "./db";
 import { setupIpc } from "./ipc";
 import { resolveLocalAssetRequest } from "./localProtocol";
+import { applyPendingRestoreIfPresent } from "./backupRestore";
 import fs from "fs";
 
 let mainWindow: BrowserWindow | null = null;
@@ -61,7 +62,13 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await applyPendingRestoreIfPresent({ userDataPath: app.getPath("userData"), now: Date.now() });
+  } catch (e) {
+    console.error("Apply pending restore failed:", e);
+  }
+
   initDb();
   setupIpc();
   

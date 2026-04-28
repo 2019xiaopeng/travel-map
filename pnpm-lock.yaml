@@ -23,6 +23,9 @@ importers:
       better-sqlite3:
         specifier: ^11.9.0
         version: 11.10.0
+      yauzl:
+        specifier: ^2.10.0
+        version: 2.10.0
       yazl:
         specifier: ^3.3.1
         version: 3.3.1
@@ -45,9 +48,6 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
-      yauzl:
-        specifier: ^2.10.0
-        version: 2.10.0
 
   packages/core:
     devDependencies:

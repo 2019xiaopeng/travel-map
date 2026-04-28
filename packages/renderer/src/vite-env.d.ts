@@ -3,6 +3,9 @@
 interface Window {
   travelMap: {
     isDev: boolean;
+    app: {
+      relaunch: () => Promise<{ ok?: boolean; error?: string }>;
+    };
     db: {
       getCity: (payload: { cityId: string; provinceId: string; cityName: string; provinceName: string }) => Promise<any>;
       getTrips: (payload: { cityId: string }) => Promise<any>;
@@ -39,6 +42,7 @@ interface Window {
       saveAsset: (sourcePath: string, destRelativeDir: string) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
       saveAssetBytes: (bytes: ArrayBuffer, originalFilename: string, mime: string, destRelativeDir: string) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
       exportBackupZip: () => Promise<{ ok?: boolean; path?: string; canceled?: boolean; error?: string; warnings?: Array<{ type: string; asset_id?: string; message: string }> }>;
+      importBackupZip: () => Promise<{ ok?: boolean; stagingPath?: string; needsRestart?: boolean; canceled?: boolean; error?: string }>;
       openLocal: (localPath: string) => Promise<{ ok?: boolean; error?: string }>;
     };
   };
