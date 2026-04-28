@@ -12,8 +12,20 @@ export type BackupAssetRow = {
 };
 
 async function sha256File(filePath: string) {
-  const buf = await fs.promises.readFile(filePath);
-  return crypto.createHash("sha256").update(buf).digest("hex");
+  const hash = crypto.createHash("sha256");
+  await new Promise<void>((resolve, reject) => {
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve());
+  });
+  return hash.digest("hex");
+}
+
+async function fileInfo(filePath: string) {
+  const stat = await fs.promises.stat(filePath);
+  const sha256 = await sha256File(filePath);
+  return { sha256, size: stat.size };
 }
 
 async function listFilesRecursively(rootDir: string): Promise<string[]> {
@@ -49,17 +61,66 @@ export async function createBackupZip(input: {
   const assetsRoot = path.resolve(path.join(input.userDataPath, "assets"));
   const dbSha256 = await sha256File(input.dbSnapshotPath);
 
+  const warnings: Array<{ type: string; asset_id?: string; message: string }> = [];
+
+  const normalizedAssets = await Promise.all(
+    input.assets.map(async (a) => {
+      const localPath = String(a.local_path ?? "");
+      if (!localPath.startsWith("assets/")) {
+        warnings.push({ type: "invalid_local_path", asset_id: a.asset_id, message: localPath });
+        return {
+          asset_id: a.asset_id,
+          sha256: a.sha256,
+          relative_path: localPath,
+          size: a.size,
+          remote_url: a.remote_url ?? null,
+        };
+      }
+
+      const abs = path.resolve(path.join(input.userDataPath, localPath));
+      if (!abs.startsWith(assetsRoot + path.sep)) {
+        warnings.push({ type: "path_outside_assets", asset_id: a.asset_id, message: localPath });
+        return {
+          asset_id: a.asset_id,
+          sha256: a.sha256,
+          relative_path: localPath,
+          size: a.size,
+          remote_url: a.remote_url ?? null,
+        };
+      }
+
+      if (!fs.existsSync(abs)) {
+        warnings.push({ type: "missing_file", asset_id: a.asset_id, message: localPath });
+        return {
+          asset_id: a.asset_id,
+          sha256: a.sha256,
+          relative_path: localPath,
+          size: a.size,
+          remote_url: a.remote_url ?? null,
+        };
+      }
+
+      const info = await fileInfo(abs);
+      if (String(a.sha256) !== info.sha256 || Number(a.size) !== info.size) {
+        warnings.push({ type: "metadata_mismatch", asset_id: a.asset_id, message: localPath });
+      }
+
+      return {
+        asset_id: a.asset_id,
+        sha256: info.sha256,
+        relative_path: localPath,
+        size: info.size,
+        remote_url: a.remote_url ?? null,
+      };
+    }),
+  );
+
   const manifest = {
     exported_at: input.exportedAt,
     app_version: input.appVersion,
     db_sha256: dbSha256,
-    assets: input.assets.map((a) => ({
-      asset_id: a.asset_id,
-      sha256: a.sha256,
-      relative_path: a.local_path,
-      size: a.size,
-      remote_url: a.remote_url ?? null,
-    })),
+    assets: normalizedAssets,
+    warnings,
   };
 
   await fs.promises.mkdir(path.dirname(input.zipPath), { recursive: true });
@@ -85,4 +146,3 @@ export async function createBackupZip(input: {
     zip.end();
   });
 }
-
