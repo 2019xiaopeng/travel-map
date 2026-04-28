@@ -635,7 +635,7 @@ export function setupIpc() {
         .prepare(`SELECT asset_id, sha256, local_path, size, remote_url FROM Asset`)
         .all() as any[];
 
-      await createBackupZip({
+      const result = await createBackupZip({
         zipPath: filePath,
         userDataPath,
         dbSnapshotPath: snapshotPath,
@@ -650,7 +650,7 @@ export function setupIpc() {
         })),
       });
 
-      return { ok: true, path: filePath };
+      return { ok: true, path: filePath, warnings: result.warnings };
     } catch (e: any) {
       console.error("Export backup failed:", e);
       return { error: e.message };

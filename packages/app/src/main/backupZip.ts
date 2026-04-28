@@ -11,6 +11,22 @@ export type BackupAssetRow = {
   remote_url: string | null;
 };
 
+export type BackupWarning = { type: string; asset_id?: string; message: string };
+
+export type BackupManifest = {
+  exported_at: number;
+  app_version: string;
+  db_sha256: string;
+  assets: Array<{
+    asset_id: string;
+    sha256: string;
+    relative_path: string;
+    size: number;
+    remote_url: string | null;
+  }>;
+  warnings: BackupWarning[];
+};
+
 async function sha256File(filePath: string) {
   const hash = crypto.createHash("sha256");
   await new Promise<void>((resolve, reject) => {
@@ -57,11 +73,11 @@ export async function createBackupZip(input: {
   appVersion: string;
   exportedAt: number;
   assets: BackupAssetRow[];
-}) {
+}): Promise<{ manifest: BackupManifest; warnings: BackupWarning[] }> {
   const assetsRoot = path.resolve(path.join(input.userDataPath, "assets"));
   const dbSha256 = await sha256File(input.dbSnapshotPath);
 
-  const warnings: Array<{ type: string; asset_id?: string; message: string }> = [];
+  const warnings: BackupWarning[] = [];
 
   const normalizedAssets = await Promise.all(
     input.assets.map(async (a) => {
@@ -115,7 +131,7 @@ export async function createBackupZip(input: {
     }),
   );
 
-  const manifest = {
+  const manifest: BackupManifest = {
     exported_at: input.exportedAt,
     app_version: input.appVersion,
     db_sha256: dbSha256,
@@ -145,4 +161,6 @@ export async function createBackupZip(input: {
     zip.outputStream.pipe(outStream);
     zip.end();
   });
+
+  return { manifest, warnings };
 }

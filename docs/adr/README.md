@@ -21,3 +21,4 @@
 - [ADR-0017 禁止在 Markdown 正文中落地 blob: URL（失败时回退为空链接）](file:///workspace/docs/adr/ADR-0017-no-blob-urls-in-markdown.md)
 - [ADR-0018 Zip 全量导出（manifest.json + db.sqlite + assets/）](file:///workspace/docs/adr/ADR-0018-backup-zip-export.md)
 - [ADR-0019 备份导出时对 manifest 进行“实物校验”](file:///workspace/docs/adr/ADR-0019-backup-manifest-verification.md)
+- [ADR-0020 备份导出 warnings 需要在 UI 可见](file:///workspace/docs/adr/ADR-0020-backup-export-warnings-surface.md)

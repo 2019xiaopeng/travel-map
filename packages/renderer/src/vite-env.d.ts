@@ -38,7 +38,7 @@ interface Window {
       select: () => Promise<string | null>;
       saveAsset: (sourcePath: string, destRelativeDir: string) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
       saveAssetBytes: (bytes: ArrayBuffer, originalFilename: string, mime: string, destRelativeDir: string) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
-      exportBackupZip: () => Promise<{ ok?: boolean; path?: string; canceled?: boolean; error?: string }>;
+      exportBackupZip: () => Promise<{ ok?: boolean; path?: string; canceled?: boolean; error?: string; warnings?: Array<{ type: string; asset_id?: string; message: string }> }>;
       openLocal: (localPath: string) => Promise<{ ok?: boolean; error?: string }>;
     };
   };

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { db } from "../../services/db";
 import { City } from "../../types";
+import { formatBackupWarnings } from "../../utils/backupWarnings";
 
 interface CityHomeProps {
   cityId: string;
@@ -126,7 +127,8 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
               const res = await window.travelMap.file.exportBackupZip();
               if (res?.canceled) return;
               if (res?.ok && res.path) {
-                alert(`备份已导出：${res.path}`);
+                const warningText = formatBackupWarnings(res.warnings ?? []);
+                alert(`备份已导出：${res.path}${warningText ? `\n\n${warningText}` : ""}`);
               } else {
                 alert(res?.error || "导出失败");
               }
