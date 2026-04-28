@@ -12,34 +12,42 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
   const [poi, setPoi] = useState<POI | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const selectedTripId = useMapStore((s) => s.selectedTripId);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [nextPoi, nextTrips, nextTags] = await Promise.all([
-        db.getPoi(poiId),
-        db.getTripsForPoi(poiId),
-        db.getTags("poi", poiId),
-      ]);
-      if (cancelled) return;
-      setPoi(nextPoi);
-      setTrips(nextTrips);
-      setTags(nextTags);
+      try {
+        const [nextPoi, nextTrips, nextTags] = await Promise.all([
+          db.getPoi(poiId),
+          db.getTripsForPoi(poiId),
+          db.getTags("poi", poiId),
+        ]);
+        if (cancelled) return;
+        setPoi(nextPoi);
+        setTrips(nextTrips);
+        setTags(nextTags);
+        setLoadError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setLoadError("加载失败");
+        setPoi(null);
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [poiId]);
 
+  if (loadError) return <div className="p-5 text-neutral-500">{loadError}</div>;
   if (!poi) return <div className="p-5 text-neutral-500">加载中...</div>;
 
   const handleChange = (field: string, value: any) => {
     const updated = { ...poi, [field]: value };
     setPoi(updated);
     
-    // Debounce the DB write
     if ((window as any)._poiSaveTimer) clearTimeout((window as any)._poiSaveTimer);
     (window as any)._poiSaveTimer = setTimeout(async () => {
       try {

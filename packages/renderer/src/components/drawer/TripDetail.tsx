@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { db } from "../../services/db";
 import MdEditor from 'react-markdown-editor-lite';
 import MarkdownIt from 'markdown-it';
@@ -7,6 +7,17 @@ import { useMapStore } from "../../features/map/mapStore";
 import { Trip, TripCost, POI, Asset, Tag } from "../../types";
 
 const mdParser = new MarkdownIt({ html: false });
+
+function extractAssetIdsFromMarkdown(markdown: string) {
+  const ids = new Set<string>();
+  const re = /local:\/\/\/assets\/[^)\s]*?\/([0-9a-fA-F-]{36})__[^)\s]+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(markdown))) {
+    const assetId = String(m[1] ?? "").trim();
+    if (assetId) ids.add(assetId);
+  }
+  return Array.from(ids);
+}
 
 interface TripDetailProps {
   tripId: string;
@@ -67,11 +78,14 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
     const updated = { ...trip, [field]: value };
     setTrip(updated);
     
-    // Debounce the DB write
     if ((window as any)._tripSaveTimer) clearTimeout((window as any)._tripSaveTimer);
     (window as any)._tripSaveTimer = setTimeout(() => {
       db.updateTrip(updated).catch((err) => console.error("Trip save failed:", err));
-      window.dispatchEvent(new Event('poi-added')); // Refresh map in case date or title changed
+      if (field === "content") {
+        const assetIds = extractAssetIdsFromMarkdown(String(value ?? ""));
+        db.setTripInlineAssets(tripId, assetIds).catch((err) => console.error("Inline asset sync failed:", err));
+      }
+      window.dispatchEvent(new Event('poi-added'));
     }, 500);
   };
 
@@ -151,8 +165,13 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
             <button
               onClick={async () => {
                 if (confirm("确定删除此旅行记录吗？")) {
-                  await db.deleteTrip(tripId);
-                  onBack();
+                  try {
+                    await db.deleteTrip(tripId);
+                    onBack();
+                  } catch (err) {
+                    console.error("Failed to delete trip:", err);
+                    alert("删除失败");
+                  }
                 }
               }}
               className="text-xs text-red-500 hover:text-red-400"
@@ -439,11 +458,9 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                           </button>
                           <button 
                             onClick={async () => {
-                              if (confirm("删除此附件记录？(文件也将被删除)")) {
+                              if (confirm("删除此附件？(若没有其他引用，将删除本地文件)")) {
                                 try {
-                                  await db.removeTag("trip_attachment", tripId, a.asset_id);
-                                  // Call a new IPC method to delete the asset file if you want, or leave it orphaned.
-                                  // For now, it removes the link. The file stays on disk until the trip is deleted.
+                                  await db.removeTripAttachment(tripId, a.asset_id);
                                   const nextAttachments = await db.getTripAttachments(tripId);
                                   setAttachments(nextAttachments);
                                 } catch (err) {

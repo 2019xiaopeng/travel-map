@@ -40,6 +40,14 @@
 pnpm install
 ```
 
+如果终端输出包含 `Ignored build scripts`，需要执行一次：
+
+```bash
+pnpm approve-builds
+```
+
+在列表里勾选允许构建的依赖（至少包含 `better-sqlite3`、`electron`、`esbuild`），否则本地开发/打包时可能出现 native 模块未编译或 Electron 相关资源缺失。
+
 ### 2) 配置环境变量（高德地图 API Key）
 
 为了让地图正常加载，你需要自己去[高德开放平台](https://console.amap.com/dev/key/app)申请一个 Web 端 (JS API) 的 Key。

@@ -14,6 +14,42 @@ export function setupIpc() {
     throw new Error("Unauthorized sender");
   };
 
+  const safeAssetAbsolutePath = (localPath: string) => {
+    const userDataPath = app.getPath("userData");
+    const assetsRoot = path.resolve(path.join(userDataPath, "assets"));
+    const absolutePath = path.resolve(path.join(userDataPath, localPath));
+    if (!absolutePath.startsWith(assetsRoot + path.sep)) return null;
+    return absolutePath;
+  };
+
+  const deleteAssetIfUnreferenced = (assetId: string) => {
+    const db = getDb();
+    const tagRefs = db.prepare(`
+      SELECT COUNT(*) as cnt
+      FROM Tag
+      WHERE name = ?
+        AND entity_type IN ('trip_attachment', 'trip_inline_asset')
+    `).get(assetId) as any;
+
+    const tripCoverRefs = db.prepare(`SELECT COUNT(*) as cnt FROM Trip WHERE cover_asset_id = ?`).get(assetId) as any;
+    const cityCoverRefs = db.prepare(`SELECT COUNT(*) as cnt FROM City WHERE cover_asset_id = ?`).get(assetId) as any;
+
+    const totalRefs = (tagRefs?.cnt || 0) + (tripCoverRefs?.cnt || 0) + (cityCoverRefs?.cnt || 0);
+    if (totalRefs > 0) return;
+
+    const row = db.prepare(`SELECT local_path FROM Asset WHERE asset_id = ?`).get(assetId) as any;
+    db.prepare(`DELETE FROM Asset WHERE asset_id = ?`).run(assetId);
+
+    const absolutePath = row?.local_path ? safeAssetAbsolutePath(row.local_path) : null;
+    if (!absolutePath) return;
+
+    fs.unlink(absolutePath, (err) => {
+      if (err && err.code !== "ENOENT") {
+        console.error(`Failed to delete asset file: ${absolutePath}`, err);
+      }
+    });
+  };
+
   ipcMain.handle("db:getCity", (event, payload: { cityId: string; provinceId: string; cityName: string; provinceName: string }) => {
     assertSender(event);
     const db = getDb();
@@ -83,6 +119,7 @@ export function setupIpc() {
     assertSender(event);
     const db = getDb();
     const now = Date.now();
+    const prev = db.prepare(`SELECT cover_asset_id FROM Trip WHERE trip_id = ?`).get(payload.trip_id) as any;
     db.prepare(
       `UPDATE Trip SET title=?, date_start=?, date_end=?, companions=?, route=?, cost_total=?, cover_asset_id=?, content=?, updated_at=? WHERE trip_id=?`,
     ).run(
@@ -97,40 +134,50 @@ export function setupIpc() {
       now,
       payload.trip_id,
     );
+    const previousCoverId = String(prev?.cover_asset_id ?? "").trim();
+    const nextCoverId = String(payload.cover_asset_id ?? "").trim();
+    if (previousCoverId && previousCoverId !== nextCoverId) {
+      deleteAssetIfUnreferenced(previousCoverId);
+    }
     return { ok: true };
   });
 
   ipcMain.handle("db:deleteTrip", (event, payload: { tripId: string }) => {
     assertSender(event);
     const db = getDb();
-    
-    // Find associated assets to delete them from disk
+
     const assets = db.prepare(`SELECT local_path FROM Asset WHERE local_path LIKE '%/trips/' || ? || '/%'`).all(payload.tripId) as any[];
-    const userDataPath = app.getPath("userData");
-    
+
     db.transaction(() => {
-      // 1. Delete associated tags (attachments, etc)
-      db.prepare(`DELETE FROM Tag WHERE entity_type IN ('trip', 'trip_attachment') AND entity_id = ?`).run(payload.tripId);
-      
-      // 2. Delete Asset records associated with this trip's folder
+      db.prepare(`DELETE FROM Tag WHERE entity_type IN ('trip', 'trip_attachment', 'trip_inline_asset') AND entity_id = ?`).run(payload.tripId);
       db.prepare(`DELETE FROM Asset WHERE local_path LIKE '%/trips/' || ? || '/%'`).run(payload.tripId);
-      
-      // 3. Delete the trip itself
       db.prepare(`DELETE FROM Trip WHERE trip_id = ?`).run(payload.tripId);
     })();
-    
-    // Physically delete the files (fire and forget, since it's a cleanup)
+
     for (const asset of assets) {
       if (asset.local_path) {
-        const fullPath = path.resolve(path.join(userDataPath, asset.local_path));
-        fs.unlink(fullPath, (err) => {
+        const absolutePath = safeAssetAbsolutePath(asset.local_path);
+        if (!absolutePath) continue;
+        fs.unlink(absolutePath, (err) => {
           if (err && err.code !== 'ENOENT') {
-            console.error(`Failed to delete asset file: ${fullPath}`, err);
+            console.error(`Failed to delete asset file: ${absolutePath}`, err);
           }
         });
       }
     }
-    
+
+    const anyLocal = assets.find((a) => typeof a?.local_path === "string")?.local_path as string | undefined;
+    if (anyLocal) {
+      const idx = anyLocal.indexOf(`/trips/${payload.tripId}`);
+      if (idx !== -1) {
+        const tripRootLocal = anyLocal.slice(0, idx + `/trips/${payload.tripId}`.length);
+        const tripRootAbs = safeAssetAbsolutePath(tripRootLocal);
+        if (tripRootAbs) {
+          fs.rm(tripRootAbs, { recursive: true, force: true }, () => {});
+        }
+      }
+    }
+
     return { ok: true };
   });
 
@@ -154,27 +201,31 @@ export function setupIpc() {
   ipcMain.handle("db:updateTripCost", (event, payload: { tripId: string; category: string; amount: number }) => {
     assertSender(event);
     const db = getDb();
-    db.prepare(`
-      INSERT INTO CostBreakdown (trip_id, category, amount)
-      VALUES (?, ?, ?)
-      ON CONFLICT(trip_id, category) DO UPDATE SET amount=excluded.amount
-    `).run(payload.tripId, payload.category, payload.amount);
+    return db.transaction(() => {
+      db.prepare(`
+        INSERT INTO CostBreakdown (trip_id, category, amount)
+        VALUES (?, ?, ?)
+        ON CONFLICT(trip_id, category) DO UPDATE SET amount=excluded.amount
+      `).run(payload.tripId, payload.category, payload.amount);
 
-    const res = db.prepare(`SELECT SUM(amount) as total FROM CostBreakdown WHERE trip_id = ?`).get(payload.tripId) as any;
-    const total = res?.total || 0;
-    db.prepare(`UPDATE Trip SET cost_total = ? WHERE trip_id = ?`).run(total, payload.tripId);
-    return total;
+      const res = db.prepare(`SELECT SUM(amount) as total FROM CostBreakdown WHERE trip_id = ?`).get(payload.tripId) as any;
+      const total = res?.total || 0;
+      db.prepare(`UPDATE Trip SET cost_total = ? WHERE trip_id = ?`).run(total, payload.tripId);
+      return total;
+    })();
   });
 
   ipcMain.handle("db:deleteTripCost", (event, payload: { tripId: string; category: string }) => {
     assertSender(event);
     const db = getDb();
-    db.prepare(`DELETE FROM CostBreakdown WHERE trip_id = ? AND category = ?`).run(payload.tripId, payload.category);
+    return db.transaction(() => {
+      db.prepare(`DELETE FROM CostBreakdown WHERE trip_id = ? AND category = ?`).run(payload.tripId, payload.category);
 
-    const res = db.prepare(`SELECT SUM(amount) as total FROM CostBreakdown WHERE trip_id = ?`).get(payload.tripId) as any;
-    const total = res?.total || 0;
-    db.prepare(`UPDATE Trip SET cost_total = ? WHERE trip_id = ?`).run(total, payload.tripId);
-    return total;
+      const res = db.prepare(`SELECT SUM(amount) as total FROM CostBreakdown WHERE trip_id = ?`).get(payload.tripId) as any;
+      const total = res?.total || 0;
+      db.prepare(`UPDATE Trip SET cost_total = ? WHERE trip_id = ?`).run(total, payload.tripId);
+      return total;
+    })();
   });
 
   ipcMain.handle("db:getTripAttachments", (event, payload: { tripId: string }) => {
@@ -187,6 +238,35 @@ export function setupIpc() {
     `).all(payload.tripId);
   });
 
+  ipcMain.handle("db:removeTripAttachment", (event, payload: { tripId: string; assetId: string }) => {
+    assertSender(event);
+    const db = getDb();
+    db.prepare(`DELETE FROM Tag WHERE entity_type = 'trip_attachment' AND entity_id = ? AND name = ?`).run(payload.tripId, payload.assetId);
+    deleteAssetIfUnreferenced(payload.assetId);
+    return { ok: true };
+  });
+
+  ipcMain.handle("db:setTripInlineAssets", (event, payload: { tripId: string; assetIds: string[] }) => {
+    assertSender(event);
+    const db = getDb();
+    const next = Array.from(new Set(payload.assetIds ?? [])).filter(Boolean);
+    const previous = db.prepare(`SELECT name FROM Tag WHERE entity_type = 'trip_inline_asset' AND entity_id = ?`).all(payload.tripId) as any[];
+    const previousIds = previous.map((r) => r.name);
+    const removed = previousIds.filter((id) => !next.includes(id));
+
+    db.transaction(() => {
+      db.prepare(`DELETE FROM Tag WHERE entity_type = 'trip_inline_asset' AND entity_id = ?`).run(payload.tripId);
+      const stmt = db.prepare(`INSERT OR IGNORE INTO Tag (entity_type, entity_id, name) VALUES ('trip_inline_asset', ?, ?)`);
+      for (const assetId of next) stmt.run(payload.tripId, assetId);
+    })();
+
+    for (const assetId of removed) {
+      deleteAssetIfUnreferenced(assetId);
+    }
+
+    return { ok: true };
+  });
+
   ipcMain.handle("db:updateCitySummary", (event, payload: { cityId: string; summary: string }) => {
     assertSender(event);
     const db = getDb();
@@ -197,7 +277,13 @@ export function setupIpc() {
   ipcMain.handle("db:updateCityCover", (event, payload: { cityId: string; assetId: string }) => {
     assertSender(event);
     const db = getDb();
+    const prev = db.prepare(`SELECT cover_asset_id FROM City WHERE city_id = ?`).get(payload.cityId) as any;
     db.prepare(`UPDATE City SET cover_asset_id = ? WHERE city_id = ?`).run(payload.assetId, payload.cityId);
+    const previousCoverId = String(prev?.cover_asset_id ?? "").trim();
+    const nextCoverId = String(payload.assetId ?? "").trim();
+    if (previousCoverId && previousCoverId !== nextCoverId) {
+      deleteAssetIfUnreferenced(previousCoverId);
+    }
     return { ok: true };
   });
 
@@ -232,7 +318,6 @@ export function setupIpc() {
       );
 
       if (payload.trip_id) {
-        // Find the current max sort_order
         const res = db.prepare(`SELECT MAX(sort_order) as max_sort FROM Trip_POI WHERE trip_id = ?`).get(payload.trip_id) as any;
         const sortOrder = (res?.max_sort || 0) + 1;
         db.prepare(`
@@ -355,6 +440,7 @@ export function setupIpc() {
 
   ipcMain.handle("file:saveAsset", async (event, payload: { sourcePath: string; destRelativeDir: string }) => {
     assertSender(event);
+    let absoluteDestPath = "";
     try {
       const sourcePath = payload.sourcePath;
       const destRelativeDir = payload.destRelativeDir;
@@ -375,7 +461,7 @@ export function setupIpc() {
 
       const userDataPath = app.getPath("userData");
       const assetsRoot = path.resolve(path.join(userDataPath, "assets"));
-      const absoluteDestPath = path.resolve(path.join(assetsRoot, normalizedDestDir, destFilename));
+      absoluteDestPath = path.resolve(path.join(assetsRoot, normalizedDestDir, destFilename));
 
       if (!absoluteDestPath.startsWith(assetsRoot + path.sep)) {
         return { error: "Invalid destination path" };
@@ -407,16 +493,45 @@ export function setupIpc() {
 
       const db = getDb();
       const now = Date.now();
-      db.prepare(`
-        INSERT INTO Asset (asset_id, type, original_filename, mime, size, sha256, local_path, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(assetId, mime.startsWith("image/") ? "image" : "file", originalFilename, mime, stats.size, sha256, destRelativePath, now);
+      try {
+        db.prepare(`
+          INSERT INTO Asset (asset_id, type, original_filename, mime, size, sha256, local_path, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(assetId, mime.startsWith("image/") ? "image" : "file", originalFilename, mime, stats.size, sha256, destRelativePath, now);
+      } catch (e: any) {
+        const message = String(e?.message ?? "");
+        if (message.includes("UNIQUE") && message.toLowerCase().includes("sha256")) {
+          const existing = db.prepare(`SELECT asset_id, local_path FROM Asset WHERE sha256 = ?`).get(sha256) as any;
+          if (absoluteDestPath) {
+            try {
+              fs.unlinkSync(absoluteDestPath);
+            } catch (err: any) {
+              if (err?.code !== "ENOENT") {
+                console.error(`Failed to cleanup duplicated asset file: ${absoluteDestPath}`, err);
+              }
+            }
+          }
+          if (existing?.asset_id && existing?.local_path) {
+            return { assetId: existing.asset_id, localUrl: `local:///${existing.local_path}` };
+          }
+        }
+        throw e;
+      }
 
       return {
         assetId,
         localUrl: `local:///${destRelativePath}`
       };
     } catch (e: any) {
+      if (absoluteDestPath) {
+        try {
+          fs.unlinkSync(absoluteDestPath);
+        } catch (err: any) {
+          if (err?.code !== "ENOENT") {
+            console.error(`Failed to cleanup asset file: ${absoluteDestPath}`, err);
+          }
+        }
+      }
       console.error("Failed to save asset:", e);
       return { error: e.message };
     }

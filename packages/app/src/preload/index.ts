@@ -31,6 +31,8 @@ const api = {
       ipcRenderer.invoke("db:deleteTripCost", payload),
 
     getTripAttachments: (payload: { tripId: string }) => ipcRenderer.invoke("db:getTripAttachments", payload),
+    removeTripAttachment: (payload: { tripId: string; assetId: string }) => ipcRenderer.invoke("db:removeTripAttachment", payload),
+    setTripInlineAssets: (payload: { tripId: string; assetIds: string[] }) => ipcRenderer.invoke("db:setTripInlineAssets", payload),
     updateCitySummary: (payload: any) => ipcRenderer.invoke("db:updateCitySummary", payload),
     updateCityCover: (payload: any) => ipcRenderer.invoke("db:updateCityCover", payload),
 

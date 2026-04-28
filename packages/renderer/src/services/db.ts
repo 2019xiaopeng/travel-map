@@ -3,6 +3,14 @@ export const db = {
     return await window.travelMap.db.getCity({ cityId, provinceId, cityName, provinceName });
   },
 
+  async updateCitySummary(cityId: string, summary: string) {
+    return await window.travelMap.db.updateCitySummary({ cityId, summary });
+  },
+
+  async updateCityCover(cityId: string, assetId: string) {
+    return await window.travelMap.db.updateCityCover({ cityId, assetId });
+  },
+
   async getTrips(cityId: string) {
     return await window.travelMap.db.getTrips({ cityId });
   },
@@ -49,6 +57,14 @@ export const db = {
 
   async getTripAttachments(tripId: string) {
     return await window.travelMap.db.getTripAttachments({ tripId });
+  },
+
+  async removeTripAttachment(tripId: string, assetId: string) {
+    return await window.travelMap.db.removeTripAttachment({ tripId, assetId });
+  },
+
+  async setTripInlineAssets(tripId: string, assetIds: string[]) {
+    return await window.travelMap.db.setTripInlineAssets({ tripId, assetIds });
   },
   
   async getTrip(tripId: string) {

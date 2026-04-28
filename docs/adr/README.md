@@ -9,3 +9,6 @@
 - [ADR-0005 地图标注 DOM 样式不依赖 Tailwind 扫描](file:///workspace/docs/adr/ADR-0005-map-marker-styling.md)
 - [ADR-0006 代码健壮性与完整性修复 (Anti-Lazy Code)](file:///workspace/docs/adr/ADR-0006-robustness-and-anti-lazy.md)
 - [ADR-0007 资产文件物理清理与深层漏洞修复](file:///workspace/docs/adr/ADR-0007-asset-cleanup-and-api-docs.md)
+- [ADR-0008 资产引用关系与垃圾回收（GC）](file:///workspace/docs/adr/ADR-0008-asset-references-and-gc.md)
+- [ADR-0009 工具链一致性（TypeScript 版本与 pnpm 构建脚本）](file:///workspace/docs/adr/ADR-0009-toolchain-consistency.md)
+- [ADR-0010 封面替换时回收旧资源](file:///workspace/docs/adr/ADR-0010-cover-replacement-gc.md)

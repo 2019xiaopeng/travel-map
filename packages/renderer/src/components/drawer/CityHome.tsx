@@ -65,10 +65,13 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
             try {
               const res = await window.travelMap.file.saveAsset(sourcePath, destDir);
               if (!res.assetId) return;
-              await window.travelMap.db.updateCityCover({ cityId, assetId: res.assetId });
+              await db.updateCityCover(cityId, res.assetId);
               const updatedCity = await db.getCity(cityId, provinceId, cityName, provinceName);
               setData(updatedCity);
-            } catch {}
+            } catch (err) {
+              console.error("上传城市封面失败", err);
+              alert("上传失败");
+            }
           };
           input.click();
         }}
@@ -97,8 +100,12 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
           onChange={(e) => setSummary(e.target.value)}
           onBlur={async (e) => {
             if (e.target.value !== (data?.summary || "")) {
-              await window.travelMap.db.updateCitySummary({ cityId, summary: e.target.value });
-              setData({ ...data, summary: e.target.value });
+              try {
+                await db.updateCitySummary(cityId, e.target.value);
+                setData({ ...data, summary: e.target.value });
+              } catch (err) {
+                console.error("更新城市简介失败", err);
+              }
             }
           }}
           rows={3}
