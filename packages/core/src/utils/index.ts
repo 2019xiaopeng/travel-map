@@ -16,7 +16,8 @@ export function parseAssetFilename(filename: string): {
   };
 }
 
-/** Build a local:// protocol URL for an asset */
-export function localAssetUrl(assetId: string): string {
-  return `local://asset/${assetId}`;
+export function localAssetUrl(localPath: string): string {
+  const normalized = String(localPath ?? "").replace(/^\/+/, "");
+  if (normalized.startsWith("assets/")) return `local://assets/${normalized.slice("assets/".length)}`;
+  return `local:///${normalized}`;
 }
