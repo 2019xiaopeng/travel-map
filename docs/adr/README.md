@@ -18,3 +18,4 @@
 - [ADR-0014 Markdown 编辑器阶段性选型以实现闭环优先](file:///workspace/docs/adr/ADR-0014-markdown-editor-mvp-choice.md)
 - [ADR-0015 附件 Tab 支持拖拽上传以闭环“导入工作流”](file:///workspace/docs/adr/ADR-0015-attachments-drag-drop.md)
 - [ADR-0016 支持粘贴图片（无文件路径）入库的 bytes IPC](file:///workspace/docs/adr/ADR-0016-paste-image-bytes-ipc.md)
+- [ADR-0017 禁止在 Markdown 正文中落地 blob: URL（失败时回退为空链接）](file:///workspace/docs/adr/ADR-0017-no-blob-urls-in-markdown.md)

@@ -6,6 +6,7 @@ import 'react-markdown-editor-lite/lib/index.css';
 import { useMapStore } from "../../features/map/mapStore";
 import { Trip, TripCost, POI, Asset, Tag } from "../../types";
 import { extractFilePaths } from "../../utils/fileDrop";
+import { deriveUploadFilename } from "../../utils/imageUpload";
 
 const mdParser = new MarkdownIt({ html: false });
 
@@ -109,7 +110,8 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
     return new Promise((resolve) => {
       const path = (file as any).path;
       if (!cityId || !cityName) {
-        resolve(URL.createObjectURL(file));
+        alert("当前未选中城市，无法上传图片");
+        resolve("");
         return;
       }
 
@@ -120,11 +122,15 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
           .saveAsset(path, destDir)
           .then((res) => {
             if (res.localUrl) resolve(res.localUrl);
-            else resolve(URL.createObjectURL(file));
+            else {
+              alert("图片上传失败");
+              resolve("");
+            }
           })
           .catch((err) => {
             console.error("图片上传失败", err);
-            resolve(URL.createObjectURL(file));
+            alert("图片上传失败");
+            resolve("");
           });
         return;
       }
@@ -133,16 +139,20 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
         .arrayBuffer()
         .then((buf) => {
           const mime = file.type || "application/octet-stream";
-          const originalFilename = file.name || "pasted-image";
+          const originalFilename = deriveUploadFilename(file);
           return window.travelMap.file.saveAssetBytes(buf, originalFilename, mime, destDir);
         })
         .then((res) => {
           if (res?.localUrl) resolve(res.localUrl);
-          else resolve(URL.createObjectURL(file));
+          else {
+            alert("图片上传失败");
+            resolve("");
+          }
         })
         .catch((err) => {
           console.error("图片上传失败", err);
-          resolve(URL.createObjectURL(file));
+          alert("图片上传失败");
+          resolve("");
         });
     });
   };
