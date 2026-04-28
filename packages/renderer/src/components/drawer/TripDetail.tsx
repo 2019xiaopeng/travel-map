@@ -108,22 +108,42 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
   const handleImageUpload = async (file: File): Promise<string> => {
     return new Promise((resolve) => {
       const path = (file as any).path;
-      if (path && cityId && cityName) {
-        const destDir = `cities/${cityId}-${cityName}/trips/${tripId}/photos`;
+      if (!cityId || !cityName) {
+        resolve(URL.createObjectURL(file));
+        return;
+      }
 
-        window.travelMap.file.saveAsset(path, destDir).then(res => {
-          if (res.localUrl) {
-            resolve(res.localUrl);
-          } else {
-            resolve(URL.createObjectURL(file)); // fallback
-          }
-        }).catch(err => {
+      const destDir = `cities/${cityId}-${cityName}/trips/${tripId}/photos`;
+
+      if (path) {
+        window.travelMap.file
+          .saveAsset(path, destDir)
+          .then((res) => {
+            if (res.localUrl) resolve(res.localUrl);
+            else resolve(URL.createObjectURL(file));
+          })
+          .catch((err) => {
+            console.error("图片上传失败", err);
+            resolve(URL.createObjectURL(file));
+          });
+        return;
+      }
+
+      file
+        .arrayBuffer()
+        .then((buf) => {
+          const mime = file.type || "application/octet-stream";
+          const originalFilename = file.name || "pasted-image";
+          return window.travelMap.file.saveAssetBytes(buf, originalFilename, mime, destDir);
+        })
+        .then((res) => {
+          if (res?.localUrl) resolve(res.localUrl);
+          else resolve(URL.createObjectURL(file));
+        })
+        .catch((err) => {
           console.error("图片上传失败", err);
           resolve(URL.createObjectURL(file));
         });
-      } else {
-        resolve(URL.createObjectURL(file));
-      }
     });
   };
 

@@ -44,6 +44,8 @@ const api = {
     select: () => ipcRenderer.invoke("file:select"),
     saveAsset: (sourcePath: string, destRelativeDir: string) =>
       ipcRenderer.invoke("file:saveAsset", { sourcePath, destRelativeDir }),
+    saveAssetBytes: (bytes: ArrayBuffer, originalFilename: string, mime: string, destRelativeDir: string) =>
+      ipcRenderer.invoke("file:saveAssetBytes", { bytes, originalFilename, mime, destRelativeDir }),
     openLocal: (localPath: string) => ipcRenderer.invoke("file:openLocal", { localPath }),
   }
 };

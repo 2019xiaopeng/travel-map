@@ -17,3 +17,4 @@
 - [ADR-0013 local:// 协议解析函数化与可回归测试](file:///workspace/docs/adr/ADR-0013-local-protocol-resolver-and-tests.md)
 - [ADR-0014 Markdown 编辑器阶段性选型以实现闭环优先](file:///workspace/docs/adr/ADR-0014-markdown-editor-mvp-choice.md)
 - [ADR-0015 附件 Tab 支持拖拽上传以闭环“导入工作流”](file:///workspace/docs/adr/ADR-0015-attachments-drag-drop.md)
+- [ADR-0016 支持粘贴图片（无文件路径）入库的 bytes IPC](file:///workspace/docs/adr/ADR-0016-paste-image-bytes-ipc.md)

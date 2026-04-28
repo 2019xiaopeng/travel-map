@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { app } from "electron";
+import { saveAssetBytesCore } from "./saveAssetBytesCore";
 
 export function setupIpc() {
   const assertSender = (event: Electron.IpcMainInvokeEvent) => {
@@ -538,6 +539,74 @@ export function setupIpc() {
       return { error: e.message };
     }
   });
+
+  ipcMain.handle(
+    "file:saveAssetBytes",
+    async (
+      event,
+      payload: { bytes: ArrayBuffer; originalFilename: string; mime: string; destRelativeDir: string },
+    ) => {
+      assertSender(event);
+      const userDataPath = app.getPath("userData");
+      const db = getDb();
+      try {
+        const bytes = new Uint8Array(payload.bytes);
+        const now = Date.now();
+        const res = await saveAssetBytesCore({
+          userDataPath,
+          destRelativeDir: payload.destRelativeDir,
+          originalFilename: payload.originalFilename,
+          bytes,
+          mime: payload.mime || "application/octet-stream",
+          now,
+          makeId: () => crypto.randomUUID(),
+          store: {
+            getBySha256: async (sha256) => {
+              const row = db.prepare(`SELECT asset_id, local_path FROM Asset WHERE sha256 = ?`).get(sha256) as any;
+              if (!row?.asset_id || !row?.local_path) return null;
+              return { assetId: row.asset_id, localPath: row.local_path };
+            },
+            insert: async (record) => {
+              db.prepare(`
+                INSERT INTO Asset (asset_id, type, original_filename, mime, size, sha256, local_path, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              `).run(
+                record.assetId,
+                record.type,
+                record.originalFilename,
+                record.mime,
+                record.size,
+                record.sha256,
+                record.localPath,
+                record.createdAt,
+              );
+              return record.assetId;
+            },
+          },
+          fs: {
+            mkdirp: async (absDir) => {
+              await fs.promises.mkdir(absDir, { recursive: true });
+            },
+            writeFile: async (absPath, nextBytes) => {
+              await fs.promises.writeFile(absPath, nextBytes);
+            },
+            unlink: async (absPath) => {
+              try {
+                await fs.promises.unlink(absPath);
+              } catch (err: any) {
+                if (err?.code !== "ENOENT") throw err;
+              }
+            },
+          },
+        });
+
+        return res;
+      } catch (e: any) {
+        console.error("Failed to save asset bytes:", e);
+        return { error: e.message };
+      }
+    },
+  );
 
   ipcMain.handle("file:openLocal", async (event, payload: { localPath: string }) => {
     assertSender(event);
