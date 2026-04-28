@@ -14,3 +14,4 @@
 - [ADR-0010 封面替换时回收旧资源](file:///workspace/docs/adr/ADR-0010-cover-replacement-gc.md)
 - [ADR-0011 POI 点选添加流程与坐标约定对齐](file:///workspace/docs/adr/ADR-0011-poi-add-flow-and-coordinates.md)
 - [ADR-0012 local:// URL 结构与文档对齐（兼容双格式）](file:///workspace/docs/adr/ADR-0012-local-url-format-alignment.md)
+- [ADR-0013 local:// 协议解析函数化与可回归测试](file:///workspace/docs/adr/ADR-0013-local-protocol-resolver-and-tests.md)

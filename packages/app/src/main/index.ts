@@ -1,8 +1,9 @@
 import { app, shell, BrowserWindow, protocol, net } from "electron";
-import { join, normalize, resolve } from "path";
+import { join } from "path";
 import { is } from "@electron-toolkit/utils";
 import { initDb, getDb } from "./db";
 import { setupIpc } from "./ipc";
+import { resolveLocalAssetRequest } from "./localProtocol";
 import fs from "fs";
 
 let mainWindow: BrowserWindow | null = null;
@@ -67,28 +68,21 @@ app.whenReady().then(() => {
   // Handle local:// protocol
   protocol.handle('local', async (request) => {
     try {
-      const url = new URL(request.url);
-      const hostPart = url.host ? `${url.host}/` : "";
-      const pathPart = url.pathname.replace(/^\/+/, "");
-      const relativePath = decodeURIComponent(`${hostPart}${pathPart}`);
       const userDataPath = app.getPath('userData');
-      const absolutePath = resolve(join(userDataPath, relativePath));
-      const assetsRoot = resolve(join(userDataPath, 'assets'));
-      const sep = normalize('/');
-      const assetsRootWithSep = assetsRoot.endsWith(sep) ? assetsRoot : `${assetsRoot}${sep}`;
+      const resolved = resolveLocalAssetRequest({ requestUrl: request.url, userDataPath });
 
       // Security check: prevent path traversal
-      if (!absolutePath.startsWith(assetsRootWithSep)) {
+      if (!resolved.allowed) {
         return new Response('Access Denied', { status: 403 });
       }
 
-      if (fs.existsSync(absolutePath)) {
-        return net.fetch(`file://${absolutePath}`);
+      if (fs.existsSync(resolved.absolutePath)) {
+        return net.fetch(`file://${resolved.absolutePath}`);
       }
 
       // If file not found locally, try to find remote_url in DB
       const db = getDb();
-      const asset = db.prepare(`SELECT remote_url FROM Asset WHERE local_path = ?`).get(relativePath) as any;
+      const asset = db.prepare(`SELECT remote_url FROM Asset WHERE local_path = ?`).get(resolved.relativePath) as any;
       
       if (asset && asset.remote_url) {
         const target = new URL(asset.remote_url);
