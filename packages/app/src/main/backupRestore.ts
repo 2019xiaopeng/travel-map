@@ -33,6 +33,7 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
   await ensureDir(stagingPath);
 
   const pendingPath = path.join(input.userDataPath, "restore-pending.json");
+  const warnings: Array<{ type: string; asset_id?: string; message: string }> = [];
 
   await new Promise<void>((resolve, reject) => {
     yauzl.open(input.zipPath, { lazyEntries: true }, (err, zipfile) => {
@@ -70,9 +71,23 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
     });
   });
 
+  try {
+    const manifestPath = path.join(stagingPath, "manifest.json");
+    if (fs.existsSync(manifestPath)) {
+      const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
+      if (Array.isArray(manifest?.warnings)) {
+        for (const w of manifest.warnings) {
+          if (w && typeof w.type === "string" && typeof w.message === "string") {
+            warnings.push({ type: w.type, asset_id: typeof w.asset_id === "string" ? w.asset_id : undefined, message: w.message });
+          }
+        }
+      }
+    }
+  } catch {}
+
   await fs.promises.writeFile(pendingPath, JSON.stringify({ stagingPath }, null, 2), "utf8");
 
-  return { ok: true as const, stagingPath };
+  return { ok: true as const, stagingPath, warnings };
 }
 
 export async function applyPendingRestoreIfPresent(input: { userDataPath: string; now: number }) {

@@ -677,7 +677,7 @@ export function setupIpc() {
     try {
       const now = Date.now();
       const res = await stageRestoreFromZip({ zipPath: filePaths[0], userDataPath, now });
-      return { ok: true, stagingPath: res.stagingPath, needsRestart: true };
+      return { ok: true, stagingPath: res.stagingPath, needsRestart: true, warnings: res.warnings };
     } catch (e: any) {
       console.error("Import backup failed:", e);
       return { error: e.message };

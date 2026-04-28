@@ -153,7 +153,8 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
                 alert(res?.error || "导入失败");
                 return;
               }
-              const ok = confirm("备份已导入，重启后将替换当前数据。是否立即重启？");
+              const warningText = formatBackupWarnings(res.warnings ?? []);
+              const ok = confirm(`备份已导入，重启后将替换当前数据。是否立即重启？${warningText ? `\n\n${warningText}` : ""}`);
               if (ok) {
                 await window.travelMap.app.relaunch();
               }
