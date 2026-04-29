@@ -48,3 +48,17 @@ test("ui.form resolves values or null", async () => {
   const res = await p;
   assert.deepEqual(res, { category: "a", amount: "12.5" });
 });
+
+test("opening new dialog cancels previous dialog", async () => {
+  const p1 = ui.confirm({ title: "a", message: "b" });
+  const p2 = ui.prompt({ title: "c", message: "d" });
+
+  const r1 = await p1;
+  assert.equal(r1, false);
+
+  const dialog = uiStores.dialog.getState().dialog;
+  assert.equal(dialog?.mode, "prompt");
+  dialog?.resolve(true, "x");
+  const r2 = await p2;
+  assert.equal(r2, "x");
+});

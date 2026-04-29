@@ -34,3 +34,4 @@
 - [ADR-0030 用应用内 Prompt/Form Dialog 替换系统 prompt](file:///workspace/docs/adr/ADR-0030-in-app-prompt-form-dialog.md)
 - [ADR-0031 标签新增改为 Inline（标题行右侧）](file:///workspace/docs/adr/ADR-0031-inline-tag-adder.md)
 - [ADR-0032 备份恢复流程加固（pending 校验、manifest 严格解析、zip 资源上限）](file:///workspace/docs/adr/ADR-0032-backup-restore-hardening.md)
+- [ADR-0033 UI Overlay 加固（Dialog 退出手势、Toast 定时器清理、标签输入约束）](file:///workspace/docs/adr/ADR-0033-ui-overlay-hardening.md)

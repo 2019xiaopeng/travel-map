@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ui } from "../services/ui";
-import { normalizeTagInput } from "../utils/tags";
+import { normalizeTagInput, validateTagInput } from "../utils/tags";
 
 export function InlineTagAdder(props: { existingTags: string[]; onAdd: (tag: string) => Promise<void>; placeholder?: string }) {
   const [editing, setEditing] = useState(false);
@@ -18,8 +18,16 @@ export function InlineTagAdder(props: { existingTags: string[]; onAdd: (tag: str
   const canSubmit = current.length > 0;
 
   const submit = async () => {
-    const next = normalizeTagInput(value);
-    if (!next) return;
+    const validated = validateTagInput(value);
+    if (!validated.ok) {
+      if (validated.error === "empty") return;
+      if (validated.error === "too_long") ui.toast.info("标签过长（最多 32 字符）");
+      else if (validated.error === "whitespace") ui.toast.info("标签不能包含空格");
+      else ui.toast.info("标签包含非法字符");
+      return;
+    }
+
+    const next = validated.value;
     if (normalizedExisting.has(next.toLowerCase())) {
       ui.toast.info("标签已存在");
       return;
@@ -80,4 +88,3 @@ export function InlineTagAdder(props: { existingTags: string[]; onAdd: (tag: str
     </div>
   );
 }
-

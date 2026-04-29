@@ -15,6 +15,16 @@ export function DialogHost() {
 
   if (!dialog) return null;
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (dialog.cancelText) dialog.resolve(false);
+      else dialog.resolve(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [dialog]);
+
   const detailsText = [dialog.message, dialog.details ? `\n\n${dialog.details}` : ""].join("");
   const showCopy = Boolean(dialog.details) || dialog.mode === "prompt" || dialog.mode === "form";
 
@@ -87,7 +97,13 @@ export function DialogHost() {
     ) : null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (dialog.cancelText) dialog.resolve(false);
+      }}
+    >
       <div className="w-[520px] max-w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
           <div className="min-w-0">

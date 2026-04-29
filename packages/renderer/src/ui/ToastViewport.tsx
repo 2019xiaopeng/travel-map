@@ -30,6 +30,13 @@ export function ToastViewport() {
     }
   }, [toasts, dismiss]);
 
+  useEffect(() => {
+    return () => {
+      for (const v of timers.current.values()) clearTimeout(v);
+      timers.current.clear();
+    };
+  }, []);
+
   if (toasts.length === 0) return null;
 
   return (
@@ -56,4 +63,3 @@ export function ToastViewport() {
     </div>
   );
 }
-

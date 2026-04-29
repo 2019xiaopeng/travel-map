@@ -30,6 +30,16 @@ function id() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function cancelCurrentDialog() {
+  const current = uiStores.dialog.getState().dialog;
+  if (!current) return;
+  try {
+    current.resolve(false);
+  } catch {
+    uiStores.dialog.getState().setDialog(null);
+  }
+}
+
 export const uiStores = {
   toast: create<{
     toasts: ToastItem[];
@@ -75,8 +85,7 @@ export const ui = {
     cancelText?: string;
     danger?: boolean;
   }) => {
-    const current = uiStores.dialog.getState().dialog;
-    if (current) current.resolve(false);
+    cancelCurrentDialog();
 
     return new Promise<boolean>((resolve) => {
       const dialogId = id();
@@ -98,8 +107,7 @@ export const ui = {
     });
   },
   alert: (input: { title: string; message: string; details?: string; confirmText?: string }) => {
-    const current = uiStores.dialog.getState().dialog;
-    if (current) current.resolve(false);
+    cancelCurrentDialog();
 
     return new Promise<void>((resolve) => {
       const dialogId = id();
@@ -121,8 +129,7 @@ export const ui = {
     });
   },
   prompt: (input: { title: string; message: string; placeholder?: string; defaultValue?: string; confirmText?: string; cancelText?: string }) => {
-    const current = uiStores.dialog.getState().dialog;
-    if (current) current.resolve(false);
+    cancelCurrentDialog();
 
     return new Promise<string | null>((resolve) => {
       const dialogId = id();
@@ -151,8 +158,7 @@ export const ui = {
     cancelText?: string;
     danger?: boolean;
   }) => {
-    const current = uiStores.dialog.getState().dialog;
-    if (current) current.resolve(false);
+    cancelCurrentDialog();
 
     return new Promise<Record<string, string> | null>((resolve) => {
       const dialogId = id();
