@@ -12,14 +12,15 @@ export type ToastItem = {
 
 export type DialogItem = {
   id: string;
-  mode: "confirm" | "alert";
+  mode: "confirm" | "alert" | "prompt" | "form";
   title: string;
   message: string;
   details?: string;
   confirmText: string;
   cancelText?: string;
   danger: boolean;
-  resolve: (ok: boolean) => void;
+  payload?: any;
+  resolve: (ok: boolean, data?: any) => void;
 };
 
 function id() {
@@ -92,7 +93,7 @@ export const ui = {
         confirmText: input.confirmText ?? "确定",
         cancelText: input.cancelText ?? "取消",
         danger: input.danger ?? false,
-        resolve: finalize,
+        resolve: (ok) => finalize(ok),
       });
     });
   },
@@ -119,5 +120,57 @@ export const ui = {
       });
     });
   },
-};
+  prompt: (input: { title: string; message: string; placeholder?: string; defaultValue?: string; confirmText?: string; cancelText?: string }) => {
+    const current = uiStores.dialog.getState().dialog;
+    if (current) current.resolve(false);
 
+    return new Promise<string | null>((resolve) => {
+      const dialogId = id();
+      uiStores.dialog.getState().setDialog({
+        id: dialogId,
+        mode: "prompt",
+        title: input.title,
+        message: input.message,
+        confirmText: input.confirmText ?? "确定",
+        cancelText: input.cancelText ?? "取消",
+        danger: false,
+        payload: { placeholder: input.placeholder ?? "", defaultValue: input.defaultValue ?? "" },
+        resolve: (ok, data) => {
+          uiStores.dialog.getState().setDialog(null);
+          if (!ok) return resolve(null);
+          resolve(String(data ?? "").trim());
+        },
+      });
+    });
+  },
+  form: (input: {
+    title: string;
+    message: string;
+    fields: Array<{ key: string; label: string; type: "text" | "number"; placeholder?: string; defaultValue?: string }>;
+    confirmText?: string;
+    cancelText?: string;
+    danger?: boolean;
+  }) => {
+    const current = uiStores.dialog.getState().dialog;
+    if (current) current.resolve(false);
+
+    return new Promise<Record<string, string> | null>((resolve) => {
+      const dialogId = id();
+      uiStores.dialog.getState().setDialog({
+        id: dialogId,
+        mode: "form",
+        title: input.title,
+        message: input.message,
+        confirmText: input.confirmText ?? "确定",
+        cancelText: input.cancelText ?? "取消",
+        danger: input.danger ?? false,
+        payload: { fields: input.fields },
+        resolve: (ok, data) => {
+          uiStores.dialog.getState().setDialog(null);
+          if (!ok) return resolve(null);
+          resolve((data ?? null) as any);
+        },
+      });
+    });
+  },
+};

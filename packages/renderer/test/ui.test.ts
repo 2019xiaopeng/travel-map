@@ -24,3 +24,27 @@ test("ui.confirm resolves true/false and clears state", async () => {
   assert.equal(uiStores.dialog.getState().dialog, null);
 });
 
+test("ui.prompt resolves value or null", async () => {
+  const p = ui.prompt({ title: "t", message: "m", placeholder: "x" });
+  const dialog = uiStores.dialog.getState().dialog;
+  assert.equal(Boolean(dialog), true);
+  dialog?.resolve(true, " ok ");
+  const res = await p;
+  assert.equal(res, "ok");
+});
+
+test("ui.form resolves values or null", async () => {
+  const p = ui.form({
+    title: "t",
+    message: "m",
+    fields: [
+      { key: "category", label: "类别", type: "text" },
+      { key: "amount", label: "金额", type: "number" },
+    ],
+  });
+  const dialog = uiStores.dialog.getState().dialog;
+  assert.equal(Boolean(dialog), true);
+  dialog?.resolve(true, { category: "a", amount: "12.5" });
+  const res = await p;
+  assert.deepEqual(res, { category: "a", amount: "12.5" });
+});

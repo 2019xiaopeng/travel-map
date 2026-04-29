@@ -285,7 +285,13 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
               <div className="text-[11px] text-neutral-500">标签</div>
               <button 
                 onClick={async () => {
-                  const tag = prompt("输入新标签:");
+                  const tag = await ui.prompt({
+                    title: "添加标签",
+                    message: "输入新标签",
+                    placeholder: "例如：美食/亲子/徒步",
+                    confirmText: "添加",
+                    cancelText: "取消",
+                  });
                   if (tag) {
                     try {
                       await db.addTag("trip", tripId, tag);
@@ -430,11 +436,21 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                   <h4 className="text-sm font-medium text-white">记账明细</h4>
                   <button 
                     onClick={async () => {
-                      const category = prompt("输入花费类别(如: 交通, 住宿):");
-                      const amount = prompt("输入花费金额:");
-                      if (category && amount && !isNaN(Number(amount))) {
+                      const res = await ui.form({
+                        title: "记一笔花费",
+                        message: "填写类别与金额",
+                        confirmText: "保存",
+                        cancelText: "取消",
+                        fields: [
+                          { key: "category", label: "类别", type: "text", placeholder: "例如：交通/住宿/餐饮" },
+                          { key: "amount", label: "金额", type: "number", placeholder: "例如：128.50" },
+                        ],
+                      });
+                      const category = String(res?.category ?? "").trim();
+                      const amount = Number(res?.amount);
+                      if (res && category && Number.isFinite(amount) && amount > 0) {
                         try {
-                          await db.updateTripCost(tripId, category, Number(amount));
+                          await db.updateTripCost(tripId, category, amount);
                           const t = await db.getTrip(tripId);
                           const nextCosts = await db.getTripCosts(tripId);
                           setTrip(t);
