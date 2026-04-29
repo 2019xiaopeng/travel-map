@@ -40,6 +40,27 @@ function safeJoin(baseDir: string, rel: string) {
   return abs;
 }
 
+async function writeJsonAtomic(filePath: string, value: any) {
+  const dir = path.dirname(filePath);
+  await ensureDir(dir);
+  const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  await fs.promises.writeFile(tmp, JSON.stringify(value, null, 2), "utf8");
+  await fs.promises.rename(tmp, filePath);
+}
+
+async function readJson(filePath: string) {
+  return JSON.parse(await fs.promises.readFile(filePath, "utf8"));
+}
+
+function uniquePath(p: string) {
+  if (!fs.existsSync(p)) return p;
+  for (let i = 1; i < 1000; i++) {
+    const next = `${p}-${i}`;
+    if (!fs.existsSync(next)) return next;
+  }
+  return `${p}-${Date.now()}`;
+}
+
 async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, absDest: string) {
   await ensureDir(path.dirname(absDest));
   await new Promise<void>((resolve, reject) => {
@@ -259,12 +280,16 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
 }
 
 export async function applyPendingRestoreIfPresent(input: { userDataPath: string; now: number }) {
+  const txPath = path.join(input.userDataPath, "restore-transaction.json");
   const pendingPath = path.join(input.userDataPath, "restore-pending.json");
+  if (fs.existsSync(txPath)) {
+    return await applyRestoreTransaction({ userDataPath: input.userDataPath, txPath, pendingPath });
+  }
   if (!fs.existsSync(pendingPath)) return false;
 
   let pending: any;
   try {
-    pending = JSON.parse(await fs.promises.readFile(pendingPath, "utf8"));
+    pending = await readJson(pendingPath);
   } catch {
     await fs.promises.unlink(pendingPath);
     return false;
@@ -287,7 +312,6 @@ export async function applyPendingRestoreIfPresent(input: { userDataPath: string
 
   const stagedDb = path.join(stagingPath, "travel-map.sqlite");
   const stagedAssets = path.join(stagingPath, "assets");
-
   if (!fs.existsSync(stagedDb) || !fs.existsSync(stagedAssets)) {
     await fs.promises.unlink(pendingPath);
     try {
@@ -299,73 +323,126 @@ export async function applyPendingRestoreIfPresent(input: { userDataPath: string
   const currentDb = path.join(input.userDataPath, "travel-map.sqlite");
   const currentAssets = path.join(input.userDataPath, "assets");
 
-  const uniquePath = (p: string) => {
-    if (!fs.existsSync(p)) return p;
-    for (let i = 1; i < 1000; i++) {
-      const next = `${p}-${i}`;
-      if (!fs.existsSync(next)) return next;
-    }
-    return `${p}-${Date.now()}`;
+  const tx = {
+    version: 1,
+    now: input.now,
+    stagingPath,
+    phase: "init",
+    paths: {
+      currentDb,
+      currentAssets,
+      dbBak: uniquePath(`${currentDb}.bak-${input.now}`),
+      assetsBak: uniquePath(path.join(input.userDataPath, `assets.bak-${input.now}`)),
+    },
   };
+  await writeJsonAtomic(txPath, tx);
+  return await applyRestoreTransaction({ userDataPath: input.userDataPath, txPath, pendingPath });
+}
 
-  const dbBak = uniquePath(`${currentDb}.bak-${input.now}`);
-  const assetsBak = uniquePath(path.join(input.userDataPath, `assets.bak-${input.now}`));
-
-  let movedCurrentDb = false;
-  let movedCurrentAssets = false;
-  let movedStagedDb = false;
-  let movedStagedAssets = false;
-
+async function applyRestoreTransaction(input: { userDataPath: string; txPath: string; pendingPath: string }) {
+  let tx: any;
   try {
-    if (fs.existsSync(currentDb)) {
-      await fs.promises.rename(currentDb, dbBak);
-      movedCurrentDb = true;
-    }
-    if (fs.existsSync(currentAssets)) {
-      await fs.promises.rename(currentAssets, assetsBak);
-      movedCurrentAssets = true;
-    }
-
-    await fs.promises.rename(stagedDb, currentDb);
-    movedStagedDb = true;
-    await fs.promises.rename(stagedAssets, currentAssets);
-    movedStagedAssets = true;
-
-    await fs.promises.unlink(pendingPath);
-    try {
-      await fs.promises.rm(stagingPath, { recursive: true, force: true });
-    } catch {}
-    return true;
+    tx = await readJson(input.txPath);
   } catch {
     try {
-      if (movedStagedAssets && movedCurrentAssets && fs.existsSync(currentAssets) && fs.existsSync(assetsBak)) {
-        const failed = uniquePath(path.join(input.userDataPath, `assets.failed-${input.now}`));
-        await fs.promises.rename(currentAssets, failed);
-        await fs.promises.rename(assetsBak, currentAssets);
-      } else if (movedCurrentAssets && fs.existsSync(assetsBak) && !fs.existsSync(currentAssets)) {
-        await fs.promises.rename(assetsBak, currentAssets);
-      }
+      await fs.promises.unlink(input.txPath);
     } catch {}
+    return false;
+  }
 
+  const stagingPath = String(tx?.stagingPath ?? "");
+  const resolvedUserData = path.resolve(input.userDataPath);
+  const resolvedStaging = path.resolve(stagingPath);
+  const stagingBase = path.basename(resolvedStaging);
+  const inUserData = resolvedStaging === resolvedUserData || resolvedStaging.startsWith(resolvedUserData + path.sep);
+  const isRestoreStaging = stagingBase.startsWith("restore-staging-");
+  if (!stagingPath || !inUserData || !isRestoreStaging) {
     try {
-      if (movedStagedDb && movedCurrentDb && fs.existsSync(currentDb) && fs.existsSync(dbBak)) {
-        const failed = uniquePath(`${currentDb}.failed-${input.now}`);
-        await fs.promises.rename(currentDb, failed);
-        await fs.promises.rename(dbBak, currentDb);
-      } else if (movedCurrentDb && fs.existsSync(dbBak) && !fs.existsSync(currentDb)) {
-        await fs.promises.rename(dbBak, currentDb);
+      await fs.promises.unlink(input.txPath);
+    } catch {}
+    return false;
+  }
+
+  const currentDb = String(tx?.paths?.currentDb ?? path.join(input.userDataPath, "travel-map.sqlite"));
+  const currentAssets = String(tx?.paths?.currentAssets ?? path.join(input.userDataPath, "assets"));
+  const dbBak = String(tx?.paths?.dbBak ?? uniquePath(`${currentDb}.bak-${Number(tx?.now ?? Date.now())}`));
+  const assetsBak = String(tx?.paths?.assetsBak ?? uniquePath(path.join(input.userDataPath, `assets.bak-${Number(tx?.now ?? Date.now())}`)));
+
+  const stagedDb = path.join(stagingPath, "travel-map.sqlite");
+  const stagedAssets = path.join(stagingPath, "assets");
+
+  const phase = String(tx?.phase ?? "init");
+
+  try {
+    if (phase === "init") {
+      if (fs.existsSync(currentDb) && !fs.existsSync(dbBak)) await fs.promises.rename(currentDb, dbBak);
+      if (fs.existsSync(currentAssets) && !fs.existsSync(assetsBak)) await fs.promises.rename(currentAssets, assetsBak);
+      tx.phase = "backed_up";
+      tx.paths = { currentDb, currentAssets, dbBak, assetsBak };
+      await writeJsonAtomic(input.txPath, tx);
+    }
+
+    if (tx.phase === "backed_up") {
+      if (fs.existsSync(stagedDb) && !fs.existsSync(currentDb)) await fs.promises.rename(stagedDb, currentDb);
+      if (!fs.existsSync(stagedDb) && fs.existsSync(currentDb)) {
+        tx.phase = "db_swapped";
+      } else if (fs.existsSync(currentDb)) {
+        tx.phase = "db_swapped";
       }
-    } catch {}
+      await writeJsonAtomic(input.txPath, tx);
+    }
 
+    if (tx.phase === "db_swapped") {
+      if (fs.existsSync(stagedAssets) && !fs.existsSync(currentAssets)) await fs.promises.rename(stagedAssets, currentAssets);
+      if (!fs.existsSync(stagedAssets) && fs.existsSync(currentAssets)) {
+        tx.phase = "assets_swapped";
+      } else if (fs.existsSync(currentAssets)) {
+        tx.phase = "assets_swapped";
+      }
+      await writeJsonAtomic(input.txPath, tx);
+    }
+
+    if (tx.phase === "assets_swapped") {
+      try {
+        await fs.promises.unlink(input.pendingPath);
+      } catch {}
+      tx.phase = "committed";
+      await writeJsonAtomic(input.txPath, tx);
+    }
+
+    if (tx.phase === "committed") {
+      try {
+        await fs.promises.rm(stagingPath, { recursive: true, force: true });
+      } catch {}
+      tx.phase = "cleaned";
+      await writeJsonAtomic(input.txPath, tx);
+    }
+
+    if (tx.phase === "cleaned") {
+      try {
+        await fs.promises.unlink(input.txPath);
+      } catch {}
+      return true;
+    }
+
+    return false;
+  } catch {
     try {
-      await fs.promises.unlink(pendingPath);
+      if (fs.existsSync(dbBak) && !fs.existsSync(currentDb)) await fs.promises.rename(dbBak, currentDb);
     } catch {}
-
+    try {
+      if (fs.existsSync(assetsBak) && !fs.existsSync(currentAssets)) await fs.promises.rename(assetsBak, currentAssets);
+    } catch {}
+    try {
+      await fs.promises.unlink(input.pendingPath);
+    } catch {}
     try {
       const failed = uniquePath(`${stagingPath}.failed`);
       await fs.promises.rename(stagingPath, failed);
     } catch {}
-
+    try {
+      await fs.promises.unlink(input.txPath);
+    } catch {}
     return false;
   }
 }
