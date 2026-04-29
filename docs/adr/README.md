@@ -35,3 +35,4 @@
 - [ADR-0031 标签新增改为 Inline（标题行右侧）](file:///workspace/docs/adr/ADR-0031-inline-tag-adder.md)
 - [ADR-0032 备份恢复流程加固（pending 校验、manifest 严格解析、zip 资源上限）](file:///workspace/docs/adr/ADR-0032-backup-restore-hardening.md)
 - [ADR-0033 UI Overlay 加固（Dialog 退出手势、Toast 定时器清理、标签输入约束）](file:///workspace/docs/adr/ADR-0033-ui-overlay-hardening.md)
+- [ADR-0034 备份恢复更强硬化（单文件上限、可疑路径拒绝、apply 原子性/回滚）](file:///workspace/docs/adr/ADR-0034-backup-restore-atomicity-and-entry-limits.md)

@@ -40,6 +40,28 @@ test("applyPendingRestoreIfPresent clears pending when stagingPath outside userD
   assert.equal(await fs.promises.readFile(path.join(userDataPath, "travel-map.sqlite"), "utf8"), "old-db");
 });
 
+test("stageRestoreFromZip rejects oversized db.sqlite entry", async () => {
+  const prev = process.env.TRAVEL_MAP_MAX_DB_SQLITE_UNCOMPRESSED_BYTES;
+  process.env.TRAVEL_MAP_MAX_DB_SQLITE_UNCOMPRESSED_BYTES = "10";
+
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-restore-hardening-"));
+  const userDataPath = path.join(tmp, "userData");
+  await fs.promises.mkdir(userDataPath, { recursive: true });
+
+  const zipPath = path.join(tmp, "backup.zip");
+  await createZip(zipPath, [
+    { name: "manifest.json", content: Buffer.from(`{\"exported_at\":1,\"app_version\":\"0\",\"db_sha256\":\"\",\"assets\":[],\"warnings\":[]}`) },
+    { name: "db.sqlite", content: Buffer.from("x".repeat(11)) },
+  ]);
+
+  try {
+    await assert.rejects(() => stageRestoreFromZip({ zipPath, userDataPath, now: 1 }), /db\.sqlite too large/i);
+  } finally {
+    if (prev === undefined) delete process.env.TRAVEL_MAP_MAX_DB_SQLITE_UNCOMPRESSED_BYTES;
+    else process.env.TRAVEL_MAP_MAX_DB_SQLITE_UNCOMPRESSED_BYTES = prev;
+  }
+});
+
 test("applyPendingRestoreIfPresent clears pending when staging missing required files", async () => {
   const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-apply-hardening-"));
   const userDataPath = path.join(tmp, "userData");

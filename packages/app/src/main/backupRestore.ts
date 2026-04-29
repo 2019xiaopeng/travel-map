@@ -16,6 +16,18 @@ function maxRelevantZipTotalUncompressedBytes() {
   return envNumber("TRAVEL_MAP_MAX_RELEVANT_ZIP_TOTAL_UNCOMPRESSED_BYTES", 5 * 1024 * 1024 * 1024);
 }
 
+function maxDbSqliteUncompressedBytes() {
+  return envNumber("TRAVEL_MAP_MAX_DB_SQLITE_UNCOMPRESSED_BYTES", 1024 * 1024 * 1024);
+}
+
+function maxManifestUncompressedBytes() {
+  return envNumber("TRAVEL_MAP_MAX_MANIFEST_UNCOMPRESSED_BYTES", 5 * 1024 * 1024);
+}
+
+function maxAssetUncompressedBytes() {
+  return envNumber("TRAVEL_MAP_MAX_ASSET_UNCOMPRESSED_BYTES", 200 * 1024 * 1024);
+}
+
 function ensureDir(absDir: string) {
   return fs.promises.mkdir(absDir, { recursive: true });
 }
@@ -104,8 +116,26 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
             return;
           }
 
+          const uncompressed = Number(entry.uncompressedSize ?? 0);
+          if (name === "db.sqlite" && uncompressed > maxDbSqliteUncompressedBytes()) {
+            finishErr(new Error("db.sqlite too large"));
+            return;
+          }
+          if (name === "manifest.json" && uncompressed > maxManifestUncompressedBytes()) {
+            finishErr(new Error("manifest.json too large"));
+            return;
+          }
+          if (name.startsWith("assets/") && uncompressed > maxAssetUncompressedBytes()) {
+            finishErr(new Error("asset too large"));
+            return;
+          }
+
           const absDest = safeJoin(stagingPath, relDest);
           if (!absDest) {
+            if (name.startsWith("assets/")) {
+              finishErr(new Error("invalid asset path"));
+              return;
+            }
             zipfile.readEntry();
             return;
           }
@@ -269,23 +299,73 @@ export async function applyPendingRestoreIfPresent(input: { userDataPath: string
   const currentDb = path.join(input.userDataPath, "travel-map.sqlite");
   const currentAssets = path.join(input.userDataPath, "assets");
 
-  const dbBak = `${currentDb}.bak-${input.now}`;
-  const assetsBak = path.join(input.userDataPath, `assets.bak-${input.now}`);
+  const uniquePath = (p: string) => {
+    if (!fs.existsSync(p)) return p;
+    for (let i = 1; i < 1000; i++) {
+      const next = `${p}-${i}`;
+      if (!fs.existsSync(next)) return next;
+    }
+    return `${p}-${Date.now()}`;
+  };
 
-  if (fs.existsSync(currentDb)) {
-    await fs.promises.rename(currentDb, dbBak);
-  }
-  if (fs.existsSync(currentAssets)) {
-    await fs.promises.rename(currentAssets, assetsBak);
-  }
+  const dbBak = uniquePath(`${currentDb}.bak-${input.now}`);
+  const assetsBak = uniquePath(path.join(input.userDataPath, `assets.bak-${input.now}`));
 
-  await fs.promises.rename(stagedDb, currentDb);
-  await fs.promises.rename(stagedAssets, currentAssets);
+  let movedCurrentDb = false;
+  let movedCurrentAssets = false;
+  let movedStagedDb = false;
+  let movedStagedAssets = false;
 
-  await fs.promises.unlink(pendingPath);
   try {
-    await fs.promises.rm(stagingPath, { recursive: true, force: true });
-  } catch {}
+    if (fs.existsSync(currentDb)) {
+      await fs.promises.rename(currentDb, dbBak);
+      movedCurrentDb = true;
+    }
+    if (fs.existsSync(currentAssets)) {
+      await fs.promises.rename(currentAssets, assetsBak);
+      movedCurrentAssets = true;
+    }
 
-  return true;
+    await fs.promises.rename(stagedDb, currentDb);
+    movedStagedDb = true;
+    await fs.promises.rename(stagedAssets, currentAssets);
+    movedStagedAssets = true;
+
+    await fs.promises.unlink(pendingPath);
+    try {
+      await fs.promises.rm(stagingPath, { recursive: true, force: true });
+    } catch {}
+    return true;
+  } catch {
+    try {
+      if (movedStagedAssets && movedCurrentAssets && fs.existsSync(currentAssets) && fs.existsSync(assetsBak)) {
+        const failed = uniquePath(path.join(input.userDataPath, `assets.failed-${input.now}`));
+        await fs.promises.rename(currentAssets, failed);
+        await fs.promises.rename(assetsBak, currentAssets);
+      } else if (movedCurrentAssets && fs.existsSync(assetsBak) && !fs.existsSync(currentAssets)) {
+        await fs.promises.rename(assetsBak, currentAssets);
+      }
+    } catch {}
+
+    try {
+      if (movedStagedDb && movedCurrentDb && fs.existsSync(currentDb) && fs.existsSync(dbBak)) {
+        const failed = uniquePath(`${currentDb}.failed-${input.now}`);
+        await fs.promises.rename(currentDb, failed);
+        await fs.promises.rename(dbBak, currentDb);
+      } else if (movedCurrentDb && fs.existsSync(dbBak) && !fs.existsSync(currentDb)) {
+        await fs.promises.rename(dbBak, currentDb);
+      }
+    } catch {}
+
+    try {
+      await fs.promises.unlink(pendingPath);
+    } catch {}
+
+    try {
+      const failed = uniquePath(`${stagingPath}.failed`);
+      await fs.promises.rename(stagingPath, failed);
+    } catch {}
+
+    return false;
+  }
 }
