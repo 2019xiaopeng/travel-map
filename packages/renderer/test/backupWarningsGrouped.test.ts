@@ -18,7 +18,7 @@ test("formatBackupWarningsGrouped prioritizes high-risk types and aggregates cou
   assert.equal(s.includes("高风险"), true);
   assert.equal(s.includes("import_missing_asset ×2"), true);
   assert.equal(s.includes("import_asset_sha256_mismatch ×1"), true);
+  assert.equal(s.includes("示例"), true);
   assert.equal(s.includes("汇总"), true);
   assert.equal(s.includes("metadata_mismatch ×1"), true);
 });
-
