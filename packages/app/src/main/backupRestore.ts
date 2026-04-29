@@ -3,6 +3,19 @@ import path from "path";
 import yauzl from "yauzl";
 import crypto from "crypto";
 
+function envNumber(name: string, fallback: number) {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v > 0 ? v : fallback;
+}
+
+function maxRelevantZipEntries() {
+  return envNumber("TRAVEL_MAP_MAX_RELEVANT_ZIP_ENTRIES", 20000);
+}
+
+function maxRelevantZipTotalUncompressedBytes() {
+  return envNumber("TRAVEL_MAP_MAX_RELEVANT_ZIP_TOTAL_UNCOMPRESSED_BYTES", 5 * 1024 * 1024 * 1024);
+}
+
 function ensureDir(absDir: string) {
   return fs.promises.mkdir(absDir, { recursive: true });
 }
@@ -51,6 +64,28 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
     await new Promise<void>((resolve, reject) => {
       yauzl.open(input.zipPath, { lazyEntries: true }, (err, zipfile) => {
         if (err || !zipfile) return reject(err);
+        let relevantEntryCount = 0;
+        let relevantTotalUncompressed = 0;
+        let done = false;
+
+        const finishOk = () => {
+          if (done) return;
+          done = true;
+          try {
+            zipfile.close();
+          } catch {}
+          resolve();
+        };
+
+        const finishErr = (e: any) => {
+          if (done) return;
+          done = true;
+          try {
+            zipfile.close();
+          } catch {}
+          reject(e);
+        };
+
         zipfile.readEntry();
         zipfile.on("entry", (entry: yauzl.Entry) => {
           const name = entry.fileName.replace(/\\/g, "/");
@@ -75,12 +110,22 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
             return;
           }
 
+          relevantEntryCount++;
+          relevantTotalUncompressed += Number(entry.uncompressedSize ?? 0);
+          if (
+            relevantEntryCount > maxRelevantZipEntries() ||
+            relevantTotalUncompressed > maxRelevantZipTotalUncompressedBytes()
+          ) {
+            finishErr(new Error("too many entries"));
+            return;
+          }
+
           writeZipEntry(zipfile, entry, absDest)
             .then(() => zipfile.readEntry())
-            .catch((e) => reject(e));
+            .catch((e) => finishErr(e));
         });
-        zipfile.on("end", () => resolve());
-        zipfile.on("error", reject);
+        zipfile.on("end", () => finishOk());
+        zipfile.on("error", finishErr);
       });
     });
 
@@ -94,11 +139,12 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
 
     const manifestPath = path.join(stagingPath, "manifest.json");
     let manifest: any = null;
-    if (fs.existsSync(manifestPath)) {
+    const manifestExists = fs.existsSync(manifestPath);
+    if (manifestExists) {
       try {
         manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
       } catch {
-        manifest = null;
+        throw new Error("invalid manifest.json");
       }
     }
 
@@ -186,14 +232,39 @@ export async function applyPendingRestoreIfPresent(input: { userDataPath: string
   const pendingPath = path.join(input.userDataPath, "restore-pending.json");
   if (!fs.existsSync(pendingPath)) return false;
 
-  const pending = JSON.parse(await fs.promises.readFile(pendingPath, "utf8"));
+  let pending: any;
+  try {
+    pending = JSON.parse(await fs.promises.readFile(pendingPath, "utf8"));
+  } catch {
+    await fs.promises.unlink(pendingPath);
+    return false;
+  }
   const stagingPath = String(pending?.stagingPath ?? "");
-  if (!stagingPath) return false;
+  if (!stagingPath) {
+    await fs.promises.unlink(pendingPath);
+    return false;
+  }
+
+  const resolvedUserData = path.resolve(input.userDataPath);
+  const resolvedStaging = path.resolve(stagingPath);
+  const stagingBase = path.basename(resolvedStaging);
+  const inUserData = resolvedStaging === resolvedUserData || resolvedStaging.startsWith(resolvedUserData + path.sep);
+  const isRestoreStaging = stagingBase.startsWith("restore-staging-");
+  if (!inUserData || !isRestoreStaging) {
+    await fs.promises.unlink(pendingPath);
+    return false;
+  }
 
   const stagedDb = path.join(stagingPath, "travel-map.sqlite");
   const stagedAssets = path.join(stagingPath, "assets");
 
-  if (!fs.existsSync(stagedDb) || !fs.existsSync(stagedAssets)) return false;
+  if (!fs.existsSync(stagedDb) || !fs.existsSync(stagedAssets)) {
+    await fs.promises.unlink(pendingPath);
+    try {
+      await fs.promises.rm(stagingPath, { recursive: true, force: true });
+    } catch {}
+    return false;
+  }
 
   const currentDb = path.join(input.userDataPath, "travel-map.sqlite");
   const currentAssets = path.join(input.userDataPath, "assets");
