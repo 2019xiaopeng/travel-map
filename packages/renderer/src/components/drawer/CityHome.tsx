@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { db } from "../../services/db";
 import { City } from "../../types";
-import { formatBackupWarnings } from "../../utils/backupWarnings";
+import { formatBackupWarnings, formatBackupWarningsGrouped } from "../../utils/backupWarnings";
 
 interface CityHomeProps {
   cityId: string;
@@ -127,7 +127,7 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
               const res = await window.travelMap.file.exportBackupZip();
               if (res?.canceled) return;
               if (res?.ok && res.path) {
-                const warningText = formatBackupWarnings(res.warnings ?? []);
+                const warningText = formatBackupWarningsGrouped(res.warnings ?? []) || formatBackupWarnings(res.warnings ?? []);
                 alert(`备份已导出：${res.path}${warningText ? `\n\n${warningText}` : ""}`);
               } else {
                 alert(res?.error || "导出失败");
@@ -153,7 +153,7 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
                 alert(res?.error || "导入失败");
                 return;
               }
-              const warningText = formatBackupWarnings(res.warnings ?? []);
+              const warningText = formatBackupWarningsGrouped(res.warnings ?? []) || formatBackupWarnings(res.warnings ?? []);
               const ok = confirm(`备份已导入，重启后将替换当前数据。是否立即重启？${warningText ? `\n\n${warningText}` : ""}`);
               if (ok) {
                 await window.travelMap.app.relaunch();

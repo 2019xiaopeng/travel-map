@@ -28,3 +28,4 @@
 - [ADR-0024 导入备份时校验 db_sha256（防篡改/防传输损坏）](file:///workspace/docs/adr/ADR-0024-backup-import-db-sha256-validation.md)
 - [ADR-0025 导入备份时对 assets 做“清单核对”校验](file:///workspace/docs/adr/ADR-0025-backup-import-assets-validation.md)
 - [ADR-0026 导入备份时对 assets 做 sha256 校验（阈值内）](file:///workspace/docs/adr/ADR-0026-backup-import-assets-sha256-validation.md)
+- [ADR-0027 备份 warnings 在 UI 中按风险分组展示](file:///workspace/docs/adr/ADR-0027-backup-warnings-grouped-display.md)
