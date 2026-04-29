@@ -92,39 +92,72 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
     const stagedAssets = path.join(stagingPath, "assets");
     await ensureDir(stagedAssets);
 
-    try {
-      const manifestPath = path.join(stagingPath, "manifest.json");
-      if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
-        const expectedDbSha = typeof manifest?.db_sha256 === "string" ? manifest.db_sha256 : "";
-        if (expectedDbSha) {
-          const actualDbSha = await sha256File(stagedDb);
-          if (actualDbSha !== expectedDbSha) {
-            throw new Error("db_sha256 mismatch");
-          }
-        }
+    const manifestPath = path.join(stagingPath, "manifest.json");
+    let manifest: any = null;
+    if (fs.existsSync(manifestPath)) {
+      try {
+        manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
+      } catch {
+        manifest = null;
       }
-    } catch (e: any) {
-      if (String(e?.message ?? "").includes("db_sha256 mismatch")) throw e;
     }
 
-    try {
-      const manifestPath = path.join(stagingPath, "manifest.json");
-      if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
-        if (Array.isArray(manifest?.warnings)) {
-          for (const w of manifest.warnings) {
-            if (w && typeof w.type === "string" && typeof w.message === "string") {
-              warnings.push({
-                type: w.type,
-                asset_id: typeof w.asset_id === "string" ? w.asset_id : undefined,
-                message: w.message,
-              });
-            }
-          }
+    const expectedDbSha = typeof manifest?.db_sha256 === "string" ? manifest.db_sha256 : "";
+    if (expectedDbSha) {
+      const actualDbSha = await sha256File(stagedDb);
+      if (actualDbSha !== expectedDbSha) {
+        throw new Error("db_sha256 mismatch");
+      }
+    }
+
+    if (Array.isArray(manifest?.warnings)) {
+      for (const w of manifest.warnings) {
+        if (w && typeof w.type === "string" && typeof w.message === "string") {
+          warnings.push({
+            type: w.type,
+            asset_id: typeof w.asset_id === "string" ? w.asset_id : undefined,
+            message: w.message,
+          });
         }
       }
-    } catch {}
+    }
+
+    const assetsList = Array.isArray(manifest?.assets) ? manifest.assets : [];
+    const maxValidate = 5000;
+    if (assetsList.length > maxValidate) {
+      warnings.push({ type: "import_asset_validation_skipped", message: String(assetsList.length) });
+    } else {
+      for (const a of assetsList) {
+        const rel = typeof a?.relative_path === "string" ? a.relative_path : "";
+        const assetId = typeof a?.asset_id === "string" ? a.asset_id : undefined;
+        const expectedSize = typeof a?.size === "number" ? a.size : Number(a?.size);
+        if (!rel || !rel.startsWith("assets/")) {
+          warnings.push({ type: "import_invalid_asset_path", asset_id: assetId, message: rel || "<empty>" });
+          continue;
+        }
+        const abs = safeJoin(stagingPath, rel);
+        if (!abs) {
+          warnings.push({ type: "import_invalid_asset_path", asset_id: assetId, message: rel });
+          continue;
+        }
+        if (!fs.existsSync(abs)) {
+          warnings.push({ type: "import_missing_asset", asset_id: assetId, message: rel });
+          continue;
+        }
+        try {
+          const stat = await fs.promises.stat(abs);
+          if (Number.isFinite(expectedSize) && expectedSize >= 0 && stat.size !== expectedSize) {
+            warnings.push({
+              type: "import_asset_size_mismatch",
+              asset_id: assetId,
+              message: `${rel} expected=${expectedSize} actual=${stat.size}`,
+            });
+          }
+        } catch {
+          warnings.push({ type: "import_missing_asset", asset_id: assetId, message: rel });
+        }
+      }
+    }
 
     await fs.promises.writeFile(pendingPath, JSON.stringify({ stagingPath }, null, 2), "utf8");
 
