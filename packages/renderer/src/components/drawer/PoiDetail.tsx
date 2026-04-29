@@ -4,6 +4,7 @@ import { ui } from "../../services/ui";
 import { POI, Trip } from "../../types";
 import { useMapStore } from "../../features/map/mapStore";
 import { wgs84ToGcj02 } from "../../utils/coord";
+import { InlineTagAdder } from "../InlineTagAdder";
 
 interface PoiDetailProps {
   poiId: string;
@@ -175,30 +176,20 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
         <div className="pt-2 border-t border-[var(--color-border)]">
           <div className="flex justify-between items-center mb-2">
             <div className="text-[11px] text-neutral-500">标签</div>
-            <button 
-                onClick={async () => {
-                  const tag = await ui.prompt({
-                    title: "添加标签",
-                    message: "输入新标签",
-                    placeholder: "例如：美食/亲子/徒步",
-                    confirmText: "添加",
-                    cancelText: "取消",
-                  });
-                  if (tag) {
-                    try {
-                      await db.addTag("poi", poiId, tag);
-                      const nextTags = await db.getTags("poi", poiId);
-                      setTags(nextTags);
-                    } catch (err) {
-                      console.error("Failed to add tag:", err);
-                      ui.toast.error("添加标签失败");
-                    }
-                  }
-                }}
-              className="text-[10px] text-[var(--color-accent)] hover:text-white"
-            >
-              + 添加
-            </button>
+            <InlineTagAdder
+              existingTags={tags}
+              onAdd={async (tag) => {
+                try {
+                  await db.addTag("poi", poiId, tag);
+                  const nextTags = await db.getTags("poi", poiId);
+                  setTags(nextTags);
+                } catch (err) {
+                  console.error("Failed to add tag:", err);
+                  ui.toast.error("添加标签失败");
+                  throw err;
+                }
+              }}
+            />
           </div>
           <div className="flex flex-wrap gap-1.5">
             {tags.map((t, idx) => (

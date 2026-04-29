@@ -8,6 +8,7 @@ import { useMapStore } from "../../features/map/mapStore";
 import { Trip, TripCost, POI, Asset, Tag } from "../../types";
 import { extractFilePaths } from "../../utils/fileDrop";
 import { deriveUploadFilename } from "../../utils/imageUpload";
+import { InlineTagAdder } from "../InlineTagAdder";
 
 const mdParser = new MarkdownIt({ html: false });
 
@@ -283,30 +284,20 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
           <div className="pt-2 border-t border-[var(--color-border)]">
             <div className="flex justify-between items-center mb-2">
               <div className="text-[11px] text-neutral-500">标签</div>
-              <button 
-                onClick={async () => {
-                  const tag = await ui.prompt({
-                    title: "添加标签",
-                    message: "输入新标签",
-                    placeholder: "例如：美食/亲子/徒步",
-                    confirmText: "添加",
-                    cancelText: "取消",
-                  });
-                  if (tag) {
-                    try {
-                      await db.addTag("trip", tripId, tag);
-                      const nextTags = await db.getTags("trip", tripId);
-                      setTags(nextTags);
-                    } catch (err) {
-                      console.error("Failed to add tag:", err);
-                      ui.toast.error("添加标签失败");
-                    }
+              <InlineTagAdder
+                existingTags={tags}
+                onAdd={async (tag) => {
+                  try {
+                    await db.addTag("trip", tripId, tag);
+                    const nextTags = await db.getTags("trip", tripId);
+                    setTags(nextTags);
+                  } catch (err) {
+                    console.error("Failed to add tag:", err);
+                    ui.toast.error("添加标签失败");
+                    throw err;
                   }
                 }}
-                className="text-[10px] text-[var(--color-accent)] hover:text-white"
-              >
-                + 添加
-              </button>
+              />
             </div>
             <div className="flex flex-wrap gap-1.5">
               {tags.map((t, idx) => (
