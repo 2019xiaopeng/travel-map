@@ -24,3 +24,4 @@
 - [ADR-0020 备份导出 warnings 需要在 UI 可见](file:///workspace/docs/adr/ADR-0020-backup-export-warnings-surface.md)
 - [ADR-0021 备份 zip 的导入与启动时恢复](file:///workspace/docs/adr/ADR-0021-backup-zip-import-and-restore.md)
 - [ADR-0022 导入备份时提前展示 manifest.warnings](file:///workspace/docs/adr/ADR-0022-backup-import-warnings-surface.md)
+- [ADR-0023 备份导入需要结构校验与失败清理（避免半导入状态）](file:///workspace/docs/adr/ADR-0023-backup-import-structure-validation.md)

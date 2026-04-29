@@ -35,59 +35,78 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
   const pendingPath = path.join(input.userDataPath, "restore-pending.json");
   const warnings: Array<{ type: string; asset_id?: string; message: string }> = [];
 
-  await new Promise<void>((resolve, reject) => {
-    yauzl.open(input.zipPath, { lazyEntries: true }, (err, zipfile) => {
-      if (err || !zipfile) return reject(err);
-      zipfile.readEntry();
-      zipfile.on("entry", (entry: yauzl.Entry) => {
-        const name = entry.fileName.replace(/\\/g, "/");
-        if (/\/$/.test(name)) {
-          zipfile.readEntry();
-          return;
-        }
-
-        let relDest: string | null = null;
-        if (name === "db.sqlite") relDest = "travel-map.sqlite";
-        else if (name === "manifest.json") relDest = "manifest.json";
-        else if (name.startsWith("assets/")) relDest = name;
-
-        if (!relDest) {
-          zipfile.readEntry();
-          return;
-        }
-
-        const absDest = safeJoin(stagingPath, relDest);
-        if (!absDest) {
-          zipfile.readEntry();
-          return;
-        }
-
-        writeZipEntry(zipfile, entry, absDest)
-          .then(() => zipfile.readEntry())
-          .catch((e) => reject(e));
-      });
-      zipfile.on("end", () => resolve());
-      zipfile.on("error", reject);
-    });
-  });
-
   try {
-    const manifestPath = path.join(stagingPath, "manifest.json");
-    if (fs.existsSync(manifestPath)) {
-      const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
-      if (Array.isArray(manifest?.warnings)) {
-        for (const w of manifest.warnings) {
-          if (w && typeof w.type === "string" && typeof w.message === "string") {
-            warnings.push({ type: w.type, asset_id: typeof w.asset_id === "string" ? w.asset_id : undefined, message: w.message });
+    await new Promise<void>((resolve, reject) => {
+      yauzl.open(input.zipPath, { lazyEntries: true }, (err, zipfile) => {
+        if (err || !zipfile) return reject(err);
+        zipfile.readEntry();
+        zipfile.on("entry", (entry: yauzl.Entry) => {
+          const name = entry.fileName.replace(/\\/g, "/");
+          if (/\/$/.test(name)) {
+            zipfile.readEntry();
+            return;
+          }
+
+          let relDest: string | null = null;
+          if (name === "db.sqlite") relDest = "travel-map.sqlite";
+          else if (name === "manifest.json") relDest = "manifest.json";
+          else if (name.startsWith("assets/")) relDest = name;
+
+          if (!relDest) {
+            zipfile.readEntry();
+            return;
+          }
+
+          const absDest = safeJoin(stagingPath, relDest);
+          if (!absDest) {
+            zipfile.readEntry();
+            return;
+          }
+
+          writeZipEntry(zipfile, entry, absDest)
+            .then(() => zipfile.readEntry())
+            .catch((e) => reject(e));
+        });
+        zipfile.on("end", () => resolve());
+        zipfile.on("error", reject);
+      });
+    });
+
+    const stagedDb = path.join(stagingPath, "travel-map.sqlite");
+    if (!fs.existsSync(stagedDb)) {
+      throw new Error("db.sqlite is required");
+    }
+
+    const stagedAssets = path.join(stagingPath, "assets");
+    await ensureDir(stagedAssets);
+
+    try {
+      const manifestPath = path.join(stagingPath, "manifest.json");
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
+        if (Array.isArray(manifest?.warnings)) {
+          for (const w of manifest.warnings) {
+            if (w && typeof w.type === "string" && typeof w.message === "string") {
+              warnings.push({
+                type: w.type,
+                asset_id: typeof w.asset_id === "string" ? w.asset_id : undefined,
+                message: w.message,
+              });
+            }
           }
         }
       }
-    }
-  } catch {}
+    } catch {}
 
-  await fs.promises.writeFile(pendingPath, JSON.stringify({ stagingPath }, null, 2), "utf8");
+    await fs.promises.writeFile(pendingPath, JSON.stringify({ stagingPath }, null, 2), "utf8");
 
-  return { ok: true as const, stagingPath, warnings };
+    return { ok: true as const, stagingPath, warnings };
+  } catch (e) {
+    try {
+      await fs.promises.rm(stagingPath, { recursive: true, force: true });
+    } catch {}
+    throw e;
+  }
 }
 
 export async function applyPendingRestoreIfPresent(input: { userDataPath: string; now: number }) {
