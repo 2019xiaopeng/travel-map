@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../services/db";
+import { ui } from "../../services/ui";
 import MdEditor from 'react-markdown-editor-lite';
 import MarkdownIt from 'markdown-it';
 import 'react-markdown-editor-lite/lib/index.css';
@@ -110,7 +111,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
     return new Promise((resolve) => {
       const path = (file as any).path;
       if (!cityId || !cityName) {
-        alert("当前未选中城市，无法上传图片");
+        ui.toast.error("当前未选中城市，无法上传图片");
         resolve("");
         return;
       }
@@ -123,13 +124,13 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
           .then((res) => {
             if (res.localUrl) resolve(res.localUrl);
             else {
-              alert("图片上传失败");
+              ui.toast.error("图片上传失败");
               resolve("");
             }
           })
           .catch((err) => {
             console.error("图片上传失败", err);
-            alert("图片上传失败");
+            ui.toast.error("图片上传失败");
             resolve("");
           });
         return;
@@ -145,13 +146,13 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
         .then((res) => {
           if (res?.localUrl) resolve(res.localUrl);
           else {
-            alert("图片上传失败");
+            ui.toast.error("图片上传失败");
             resolve("");
           }
         })
         .catch((err) => {
           console.error("图片上传失败", err);
-          alert("图片上传失败");
+          ui.toast.error("图片上传失败");
           resolve("");
         });
     });
@@ -227,13 +228,20 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
             <h3 className="text-sm font-medium text-white">旅行详情</h3>
             <button
               onClick={async () => {
-                if (confirm("确定删除此旅行记录吗？")) {
+                const ok = await ui.confirm({
+                  title: "删除旅行记录",
+                  message: "确定删除此旅行记录吗？",
+                  confirmText: "删除",
+                  cancelText: "取消",
+                  danger: true,
+                });
+                if (ok) {
                   try {
                     await db.deleteTrip(tripId);
                     onBack();
                   } catch (err) {
                     console.error("Failed to delete trip:", err);
-                    alert("删除失败");
+                    ui.toast.error("删除失败");
                   }
                 }
               }}
@@ -285,7 +293,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                       setTags(nextTags);
                     } catch (err) {
                       console.error("Failed to add tag:", err);
-                      alert("添加标签失败");
+                      ui.toast.error("添加标签失败");
                     }
                   }
                 }}
@@ -303,14 +311,21 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                   #{t}
                   <button 
                     onClick={async () => {
-                      if (confirm(`删除标签 #${t}?`)) {
+                      const ok = await ui.confirm({
+                        title: "删除标签",
+                        message: `删除标签 #${t}?`,
+                        confirmText: "删除",
+                        cancelText: "取消",
+                        danger: true,
+                      });
+                      if (ok) {
                         try {
                           await db.removeTag("trip", tripId, t);
                           const nextTags = await db.getTags("trip", tripId);
                           setTags(nextTags);
                         } catch (err) {
                           console.error("Failed to delete tag:", err);
-                          alert("删除标签失败");
+                          ui.toast.error("删除标签失败");
                         }
                       }
                     }}
@@ -372,7 +387,14 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                           <span className="text-neutral-500 text-[10px]">{p.category}</span>
                           <button 
                             onClick={async () => {
-                              if (confirm(`从旅行中移除地点 ${p.name}？(不会删除地点本身)`)) {
+                              const ok = await ui.confirm({
+                                title: "移除地点",
+                                message: `从旅行中移除地点 ${p.name}？(不会删除地点本身)`,
+                                confirmText: "移除",
+                                cancelText: "取消",
+                                danger: true,
+                              });
+                              if (ok) {
                                 try {
                                   await db.removePoiFromTrip(tripId, p.poi_id);
                                   const nextPois = await db.getPoisForTrip(tripId);
@@ -380,6 +402,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                                   window.dispatchEvent(new Event('poi-added'));
                                 } catch (err) {
                                   console.error("Failed to remove POI from trip:", err);
+                                  ui.toast.error("移除失败");
                                 }
                               }
                             }}
@@ -418,7 +441,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                           setCosts(nextCosts);
                         } catch (err) {
                           console.error("Failed to add trip cost:", err);
-                          alert("添加花费失败");
+                          ui.toast.error("添加花费失败");
                         }
                       }
                     }}
@@ -436,7 +459,14 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                           <span className="text-[var(--color-accent)] font-medium">¥{c.amount}</span>
                           <button 
                             onClick={async () => {
-                            if (confirm(`删除 ${c.category} 的花费记录？`)) {
+                            const ok = await ui.confirm({
+                              title: "删除花费记录",
+                              message: `删除 ${c.category} 的花费记录？`,
+                              confirmText: "删除",
+                              cancelText: "取消",
+                              danger: true,
+                            });
+                            if (ok) {
                               try {
                                 await db.deleteTripCost(tripId, c.category);
                                 const t = await db.getTrip(tripId);
@@ -445,7 +475,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                                 setCosts(nextCosts);
                               } catch (err) {
                                 console.error("Failed to delete trip cost:", err);
-                                alert("删除花费失败");
+                                ui.toast.error("删除花费失败");
                               }
                             }
                           }}
@@ -490,7 +520,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                   const paths = extractFilePaths(Array.from(e.dataTransfer?.files ?? []) as any);
                   if (paths.length > 0) {
                     await uploadAttachments(paths);
-                    alert("附件上传完成");
+                    ui.toast.success("附件上传完成");
                   }
                 }}
               >
@@ -505,7 +535,7 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                         const files = Array.from(e.target.files || []);
                         const paths = extractFilePaths(files as any);
                         await uploadAttachments(paths);
-                        alert("附件上传完成");
+                        ui.toast.success("附件上传完成");
                       };
                       input.click();
                     }}
@@ -538,13 +568,21 @@ export function TripDetail({ tripId, onBack }: TripDetailProps) {
                           </button>
                           <button 
                             onClick={async () => {
-                              if (confirm("删除此附件？(若没有其他引用，将删除本地文件)")) {
+                              const ok = await ui.confirm({
+                                title: "删除附件",
+                                message: "删除此附件？(若没有其他引用，将删除本地文件)",
+                                confirmText: "删除",
+                                cancelText: "取消",
+                                danger: true,
+                              });
+                              if (ok) {
                                 try {
                                   await db.removeTripAttachment(tripId, a.asset_id);
                                   const nextAttachments = await db.getTripAttachments(tripId);
                                   setAttachments(nextAttachments);
                                 } catch (err) {
                                   console.error("Failed to remove attachment:", err);
+                                  ui.toast.error("删除失败");
                                 }
                               }
                             }}

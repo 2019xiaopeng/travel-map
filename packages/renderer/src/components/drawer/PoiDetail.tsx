@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "../../services/db";
+import { ui } from "../../services/ui";
 import { POI, Trip } from "../../types";
 import { useMapStore } from "../../features/map/mapStore";
 import { wgs84ToGcj02 } from "../../utils/coord";
@@ -88,14 +89,21 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
             )}
             <button 
               onClick={async () => {
-                if (confirm("确定删除此地点吗？")) {
+                const ok = await ui.confirm({
+                  title: "删除地点",
+                  message: "确定删除此地点吗？",
+                  confirmText: "删除",
+                  cancelText: "取消",
+                  danger: true,
+                });
+                if (ok) {
                   try {
                     await db.deletePoi(poiId);
                     window.dispatchEvent(new Event('poi-added'));
                     onBack();
                   } catch (err) {
                     console.error("Failed to delete POI:", err);
-                    alert("删除失败");
+                    ui.toast.error("删除失败");
                   }
                 }
               }}
@@ -177,7 +185,7 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
                       setTags(nextTags);
                     } catch (err) {
                       console.error("Failed to add tag:", err);
-                      alert("添加标签失败");
+                      ui.toast.error("添加标签失败");
                     }
                   }
                 }}
@@ -195,14 +203,21 @@ export function PoiDetail({ poiId, onBack }: PoiDetailProps) {
                 #{t}
                 <button 
                   onClick={async () => {
-                    if (confirm(`删除标签 #${t}?`)) {
+                    const ok = await ui.confirm({
+                      title: "删除标签",
+                      message: `删除标签 #${t}?`,
+                      confirmText: "删除",
+                      cancelText: "取消",
+                      danger: true,
+                    });
+                    if (ok) {
                       try {
                         await db.removeTag("poi", poiId, t);
                         const nextTags = await db.getTags("poi", poiId);
                         setTags(nextTags);
                       } catch (err) {
                         console.error("Failed to delete tag:", err);
-                        alert("删除标签失败");
+                        ui.toast.error("删除标签失败");
                       }
                     }
                   }}

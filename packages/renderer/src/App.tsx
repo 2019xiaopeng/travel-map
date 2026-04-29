@@ -1,6 +1,8 @@
 import { Drawer } from "./components/Drawer";
 import { MapView } from "./features/map/MapView";
 import { useMapStore } from "./features/map/mapStore";
+import { DialogHost } from "./ui/DialogHost";
+import { ToastViewport } from "./ui/ToastViewport";
 
 export default function App() {
   const drawerOpen = useMapStore((s) => s.drawerOpen);
@@ -37,6 +39,9 @@ export default function App() {
 
       {/* 右侧抽屉 */}
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      <DialogHost />
+      <ToastViewport />
     </div>
   );
 }

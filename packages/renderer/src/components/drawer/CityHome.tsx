@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "../../services/db";
+import { ui } from "../../services/ui";
 import { City } from "../../types";
 import { formatBackupWarnings, formatBackupWarningsGrouped } from "../../utils/backupWarnings";
 
@@ -71,7 +72,7 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
               setData(updatedCity);
             } catch (err) {
               console.error("上传城市封面失败", err);
-              alert("上传失败");
+              ui.toast.error("上传失败");
             }
           };
           input.click();
@@ -128,13 +129,17 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
               if (res?.canceled) return;
               if (res?.ok && res.path) {
                 const warningText = formatBackupWarningsGrouped(res.warnings ?? []) || formatBackupWarnings(res.warnings ?? []);
-                alert(`备份已导出：${res.path}${warningText ? `\n\n${warningText}` : ""}`);
+                if (warningText) {
+                  await ui.alert({ title: "备份已导出", message: res.path, details: warningText });
+                } else {
+                  ui.toast.success(`备份已导出：${res.path}`);
+                }
               } else {
-                alert(res?.error || "导出失败");
+                ui.toast.error(res?.error || "导出失败");
               }
             } catch (err: any) {
               console.error("导出备份失败", err);
-              alert("导出失败");
+              ui.toast.error("导出失败");
             }
           }}
           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 py-2 text-sm font-medium text-white hover:bg-[var(--color-surface-elevated)]"
@@ -150,17 +155,24 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
               const res = await window.travelMap.file.importBackupZip();
               if (res?.canceled) return;
               if (!res?.ok) {
-                alert(res?.error || "导入失败");
+                ui.toast.error(res?.error || "导入失败");
                 return;
               }
               const warningText = formatBackupWarningsGrouped(res.warnings ?? []) || formatBackupWarnings(res.warnings ?? []);
-              const ok = confirm(`备份已导入，重启后将替换当前数据。是否立即重启？${warningText ? `\n\n${warningText}` : ""}`);
+              const ok = await ui.confirm({
+                title: "备份已导入",
+                message: "重启后将替换当前数据。是否立即重启？",
+                details: warningText || undefined,
+                confirmText: "立即重启",
+                cancelText: "稍后",
+                danger: true,
+              });
               if (ok) {
                 await window.travelMap.app.relaunch();
               }
             } catch (err: any) {
               console.error("导入备份失败", err);
-              alert("导入失败");
+              ui.toast.error("导入失败");
             }
           }}
           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 py-2 text-sm font-medium text-white hover:bg-[var(--color-surface-elevated)]"

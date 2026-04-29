@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { db } from "../../services/db";
+import { ui } from "../../services/ui";
 import { useMapStore } from "./mapStore";
 
 export function PoiAddModal() {
@@ -102,7 +103,7 @@ export function PoiAddModal() {
                 window.dispatchEvent(new Event("poi-added"));
               } catch (err) {
                 console.error("Failed to create POI:", err);
-                alert("添加失败");
+                ui.toast.error("添加失败");
               } finally {
                 setSaving(false);
               }
@@ -117,4 +118,3 @@ export function PoiAddModal() {
     </div>
   );
 }
-
