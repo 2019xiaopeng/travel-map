@@ -124,13 +124,19 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
 
     const assetsList = Array.isArray(manifest?.assets) ? manifest.assets : [];
     const maxValidate = 5000;
+    const shaValidateLimit = 200;
     if (assetsList.length > maxValidate) {
       warnings.push({ type: "import_asset_validation_skipped", message: String(assetsList.length) });
     } else {
-      for (const a of assetsList) {
+      if (assetsList.length > shaValidateLimit) {
+        warnings.push({ type: "import_asset_sha256_validation_partial", message: `${shaValidateLimit}/${assetsList.length}` });
+      }
+      for (let i = 0; i < assetsList.length; i++) {
+        const a = assetsList[i];
         const rel = typeof a?.relative_path === "string" ? a.relative_path : "";
         const assetId = typeof a?.asset_id === "string" ? a.asset_id : undefined;
         const expectedSize = typeof a?.size === "number" ? a.size : Number(a?.size);
+        const expectedSha = typeof a?.sha256 === "string" ? a.sha256 : "";
         if (!rel || !rel.startsWith("assets/")) {
           warnings.push({ type: "import_invalid_asset_path", asset_id: assetId, message: rel || "<empty>" });
           continue;
@@ -152,6 +158,12 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
               asset_id: assetId,
               message: `${rel} expected=${expectedSize} actual=${stat.size}`,
             });
+          }
+          if (expectedSha && i < shaValidateLimit) {
+            const actualSha = await sha256File(abs);
+            if (actualSha !== expectedSha) {
+              warnings.push({ type: "import_asset_sha256_mismatch", asset_id: assetId, message: rel });
+            }
           }
         } catch {
           warnings.push({ type: "import_missing_asset", asset_id: assetId, message: rel });

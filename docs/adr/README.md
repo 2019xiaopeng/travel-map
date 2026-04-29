@@ -27,3 +27,4 @@
 - [ADR-0023 备份导入需要结构校验与失败清理（避免半导入状态）](file:///workspace/docs/adr/ADR-0023-backup-import-structure-validation.md)
 - [ADR-0024 导入备份时校验 db_sha256（防篡改/防传输损坏）](file:///workspace/docs/adr/ADR-0024-backup-import-db-sha256-validation.md)
 - [ADR-0025 导入备份时对 assets 做“清单核对”校验](file:///workspace/docs/adr/ADR-0025-backup-import-assets-validation.md)
+- [ADR-0026 导入备份时对 assets 做 sha256 校验（阈值内）](file:///workspace/docs/adr/ADR-0026-backup-import-assets-sha256-validation.md)
