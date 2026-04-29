@@ -32,3 +32,4 @@
 - [ADR-0028 高风险 warnings 增加样例行以便定位](file:///workspace/docs/adr/ADR-0028-backup-warnings-sample-lines.md)
 - [ADR-0029 用应用内 Dialog/Toast 替换系统 alert/confirm](file:///workspace/docs/adr/ADR-0029-in-app-dialog-toast.md)
 - [ADR-0030 用应用内 Prompt/Form Dialog 替换系统 prompt](file:///workspace/docs/adr/ADR-0030-in-app-prompt-form-dialog.md)
+- [ADR-0031 标签新增改为 Inline（标题行右侧）](file:///workspace/docs/adr/ADR-0031-inline-tag-adder.md)
