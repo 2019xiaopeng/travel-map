@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import crypto from "crypto";
 import yazl from "yazl";
 
 import { stageRestoreFromZip } from "../src/main/backupRestore.ts";
@@ -20,26 +21,34 @@ async function createZip(zipPath: string, entries: Array<{ name: string; content
   });
 }
 
-test("stageRestoreFromZip extracts db/assets and writes pending flag", async () => {
+test("stageRestoreFromZip rejects when manifest db_sha256 mismatches db.sqlite", async () => {
   const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-restore-"));
   const userDataPath = path.join(tmp, "userData");
   await fs.promises.mkdir(userDataPath, { recursive: true });
 
+  const dbBytes = Buffer.from("db");
+  const goodSha = crypto.createHash("sha256").update(dbBytes).digest("hex");
+
   const zipPath = path.join(tmp, "backup.zip");
   await createZip(zipPath, [
-    { name: "manifest.json", content: Buffer.from(`{\"exported_at\":1,\"app_version\":\"0\",\"db_sha256\":\"\",\"assets\":[],\"warnings\":[]}`) },
-    { name: "db.sqlite", content: Buffer.from("db") },
-    { name: "assets/cities/1/a.txt", content: Buffer.from("a") },
+    {
+      name: "manifest.json",
+      content: Buffer.from(
+        JSON.stringify({
+          exported_at: 1,
+          app_version: "0",
+          db_sha256: goodSha.replace(/^./, "0"),
+          assets: [],
+          warnings: [],
+        }),
+      ),
+    },
+    { name: "db.sqlite", content: dbBytes },
   ]);
 
-  const res = await stageRestoreFromZip({ zipPath, userDataPath, now: 1 });
-  assert.equal(res.ok, true);
-  assert.equal(fs.existsSync(res.stagingPath), true);
-  assert.equal(fs.existsSync(path.join(res.stagingPath, "travel-map.sqlite")), true);
-  assert.equal(fs.existsSync(path.join(res.stagingPath, "assets/cities/1/a.txt")), true);
-
-  const pendingPath = path.join(userDataPath, "restore-pending.json");
-  assert.equal(fs.existsSync(pendingPath), true);
-  const pending = JSON.parse(await fs.promises.readFile(pendingPath, "utf8"));
-  assert.equal(pending.stagingPath, res.stagingPath);
+  await assert.rejects(
+    () => stageRestoreFromZip({ zipPath, userDataPath, now: 1 }),
+    /db_sha256 mismatch/i,
+  );
 });
+

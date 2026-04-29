@@ -33,7 +33,7 @@ test("stageRestoreFromZip returns manifest warnings when present", async () => {
         JSON.stringify({
           exported_at: 1,
           app_version: "0",
-          db_sha256: "x",
+          db_sha256: "",
           assets: [],
           warnings: [{ type: "missing_file", message: "assets/x" }],
         }),
@@ -49,4 +49,3 @@ test("stageRestoreFromZip returns manifest warnings when present", async () => {
   assert.equal(res.warnings.length, 1);
   assert.equal(res.warnings[0].type, "missing_file");
 });
-

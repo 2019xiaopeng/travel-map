@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import yauzl from "yauzl";
+import crypto from "crypto";
 
 function ensureDir(absDir: string) {
   return fs.promises.mkdir(absDir, { recursive: true });
@@ -26,6 +27,17 @@ async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, absDest
       rs.pipe(ws);
     });
   });
+}
+
+async function sha256File(filePath: string) {
+  const hash = crypto.createHash("sha256");
+  await new Promise<void>((resolve, reject) => {
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve());
+  });
+  return hash.digest("hex");
 }
 
 export async function stageRestoreFromZip(input: { zipPath: string; userDataPath: string; now: number }) {
@@ -79,6 +91,22 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
 
     const stagedAssets = path.join(stagingPath, "assets");
     await ensureDir(stagedAssets);
+
+    try {
+      const manifestPath = path.join(stagingPath, "manifest.json");
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
+        const expectedDbSha = typeof manifest?.db_sha256 === "string" ? manifest.db_sha256 : "";
+        if (expectedDbSha) {
+          const actualDbSha = await sha256File(stagedDb);
+          if (actualDbSha !== expectedDbSha) {
+            throw new Error("db_sha256 mismatch");
+          }
+        }
+      }
+    } catch (e: any) {
+      if (String(e?.message ?? "").includes("db_sha256 mismatch")) throw e;
+    }
 
     try {
       const manifestPath = path.join(stagingPath, "manifest.json");
