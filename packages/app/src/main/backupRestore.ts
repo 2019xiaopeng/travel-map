@@ -40,6 +40,31 @@ function safeJoin(baseDir: string, rel: string) {
   return abs;
 }
 
+function isUnder(base: string, p: string) {
+  const b = path.resolve(base);
+  const r = path.resolve(p);
+  return r === b || r.startsWith(b + path.sep);
+}
+
+async function isSymlink(p: string) {
+  try {
+    const stat = await fs.promises.lstat(p);
+    return stat.isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+async function validateBakPath(kind: "db" | "assets", userDataPath: string, p: string) {
+  if (!p) return null;
+  if (!isUnder(userDataPath, p)) return null;
+  const base = path.basename(p);
+  if (kind === "db" && !base.startsWith("travel-map.sqlite.bak-")) return null;
+  if (kind === "assets" && !base.startsWith("assets.bak-")) return null;
+  if (await isSymlink(p)) return null;
+  return p;
+}
+
 async function writeJsonAtomic(filePath: string, value: any) {
   const dir = path.dirname(filePath);
   await ensureDir(dir);
@@ -351,6 +376,15 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
   }
 
   const stagingPath = String(tx?.stagingPath ?? "");
+  const phase = String(tx?.phase ?? "init");
+  const allowedPhases = new Set(["init", "backed_up", "db_swapped", "assets_swapped", "committed", "cleaned"]);
+  if (tx?.version !== 1 || !allowedPhases.has(phase)) {
+    try {
+      await fs.promises.unlink(input.txPath);
+    } catch {}
+    return false;
+  }
+
   const resolvedUserData = path.resolve(input.userDataPath);
   const resolvedStaging = path.resolve(stagingPath);
   const stagingBase = path.basename(resolvedStaging);
@@ -363,15 +397,22 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     return false;
   }
 
-  const currentDb = String(tx?.paths?.currentDb ?? path.join(input.userDataPath, "travel-map.sqlite"));
-  const currentAssets = String(tx?.paths?.currentAssets ?? path.join(input.userDataPath, "assets"));
-  const dbBak = String(tx?.paths?.dbBak ?? uniquePath(`${currentDb}.bak-${Number(tx?.now ?? Date.now())}`));
-  const assetsBak = String(tx?.paths?.assetsBak ?? uniquePath(path.join(input.userDataPath, `assets.bak-${Number(tx?.now ?? Date.now())}`)));
+  const currentDb = path.join(input.userDataPath, "travel-map.sqlite");
+  const currentAssets = path.join(input.userDataPath, "assets");
+  const txNow = Number(tx?.now ?? Date.now());
+  const candidateDbBak = String(tx?.paths?.dbBak ?? uniquePath(`${currentDb}.bak-${txNow}`));
+  const candidateAssetsBak = String(tx?.paths?.assetsBak ?? uniquePath(path.join(input.userDataPath, `assets.bak-${txNow}`)));
+  const dbBak = await validateBakPath("db", input.userDataPath, candidateDbBak);
+  const assetsBak = await validateBakPath("assets", input.userDataPath, candidateAssetsBak);
+  if (!dbBak || !assetsBak) {
+    try {
+      await fs.promises.unlink(input.txPath);
+    } catch {}
+    return false;
+  }
 
   const stagedDb = path.join(stagingPath, "travel-map.sqlite");
   const stagedAssets = path.join(stagingPath, "assets");
-
-  const phase = String(tx?.phase ?? "init");
 
   try {
     if (phase === "init") {
