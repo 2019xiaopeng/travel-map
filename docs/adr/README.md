@@ -37,3 +37,4 @@
 - [ADR-0033 UI Overlay 加固（Dialog 退出手势、Toast 定时器清理、标签输入约束）](file:///workspace/docs/adr/ADR-0033-ui-overlay-hardening.md)
 - [ADR-0034 备份恢复更强硬化（单文件上限、可疑路径拒绝、apply 原子性/回滚）](file:///workspace/docs/adr/ADR-0034-backup-restore-atomicity-and-entry-limits.md)
 - [ADR-0035 备份恢复 apply 事务化（崩溃可自愈 / 强幂等）](file:///workspace/docs/adr/ADR-0035-backup-restore-transactional-apply.md)
+- [ADR-0036 Restore Transaction 恢复矩阵（phase × 磁盘状态 → 行为）](file:///workspace/docs/adr/ADR-0036-backup-restore-transaction-recovery-matrix.md)
