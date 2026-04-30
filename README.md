@@ -105,7 +105,29 @@ pnpm --filter @travel-map/app build:win
 - `travel-map.sqlite`：SQLite 数据库
 - `assets/`：图片与附件归档目录
 
-备份方式：关闭应用后将整个 `userData` 目录打包复制即可。
+### 一键备份（推荐）
+
+在应用内（城市抽屉底部）点击：
+
+- `导出备份（zip）`：导出包含 `travel-map.sqlite` 与 `assets/` 的备份包
+- `导入备份（zip）`：导入备份包到 staging，并在确认后重启应用完成替换
+
+该流程具备事务化 apply 与崩溃自愈：即使在替换过程中异常退出，下次启动也会继续推进或回滚到一致状态，避免 “db 新但 assets 旧” 的半交换。
+
+### 手工备份（兜底）
+
+关闭应用后将整个 `userData` 目录打包复制即可。
+
+## 诊断与日志（可观测性）
+
+用于排障的本地输出（默认仅写入 `userData` 下的相对路径，不包含绝对路径或用户数据内容）：
+
+- `userData/logs/restore.log`：restore/apply/cleanup 结构化日志（JSONL，按大小轮转）
+- `userData/diagnostics/restore-diagnostic-<timestamp>.json`：诊断包（版本/状态/最近事件）
+
+在应用内（城市抽屉底部）点击 `导出诊断` 可手动生成诊断包并打开所在目录；restore 失败时也会尽力自动生成一份诊断包。
+
+> 诊断包与日志默认对可能包含路径的 message 做脱敏（写入 `<redacted>`），并对 `logs/diagnostics` 目录 symlink 做防护，避免越界写盘。
 
 ## 安全边界说明
 
@@ -125,7 +147,7 @@ pnpm --filter @travel-map/app build:win
 
 - 旅行与 POI 的更强关联（在 Trip 中编辑 POI 顺序、路线规划）
 - 附件面板：列表化展示、快速打开、预览（图片/PDF）
-- 导入导出：一键打包 `userData` 目录、迁移到新设备
+- 可观测性增强：更完善的诊断包内容、导出更多非敏感运行信息
 - 可选云同步（后续阶段）
 
 ## 文档
