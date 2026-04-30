@@ -40,3 +40,4 @@
 - [ADR-0036 Restore Transaction 恢复矩阵（phase × 磁盘状态 → 行为）](file:///workspace/docs/adr/ADR-0036-backup-restore-transaction-recovery-matrix.md)
 - [ADR-0037 Restore Transaction 路径信任边界与强校验](file:///workspace/docs/adr/ADR-0037-restore-transaction-path-trust-boundary.md)
 - [ADR-0038 Restore 产物 retention 清理策略（.bak / .failed）](file:///workspace/docs/adr/ADR-0038-restore-artifacts-retention-cleanup.md)
+- [ADR-0039 Retention 可配置性与异常文件类型安全策略](file:///workspace/docs/adr/ADR-0039-retention-config-and-filetype-safety.md)
