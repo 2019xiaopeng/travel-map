@@ -497,3 +497,57 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     return false;
   }
 }
+
+export async function cleanupRestoreArtifacts(input: { userDataPath: string; now: number }) {
+  const pendingPath = path.join(input.userDataPath, "restore-pending.json");
+  const txPath = path.join(input.userDataPath, "restore-transaction.json");
+  if (fs.existsSync(pendingPath) || fs.existsSync(txPath)) return;
+
+  let entries: string[];
+  try {
+    entries = await fs.promises.readdir(input.userDataPath);
+  } catch {
+    return;
+  }
+
+  const ttlMs = 7 * 24 * 3600_000;
+  const topK = 3;
+
+  const groups: Record<"failed" | "dbBak" | "assetsBak", Array<{ abs: string; mtimeMs: number }>> = {
+    failed: [],
+    dbBak: [],
+    assetsBak: [],
+  };
+
+  for (const name of entries) {
+    let group: keyof typeof groups | null = null;
+    if (name.startsWith("restore-staging-") && name.includes(".failed")) group = "failed";
+    else if (name.startsWith("travel-map.sqlite.bak-")) group = "dbBak";
+    else if (name.startsWith("assets.bak-")) group = "assetsBak";
+    if (!group) continue;
+
+    const abs = path.join(input.userDataPath, name);
+    let stat: fs.Stats;
+    try {
+      stat = await fs.promises.lstat(abs);
+    } catch {
+      continue;
+    }
+    if (stat.isSymbolicLink()) continue;
+
+    groups[group].push({ abs, mtimeMs: stat.mtimeMs });
+  }
+
+  for (const g of Object.keys(groups) as Array<keyof typeof groups>) {
+    groups[g].sort((a, b) => b.mtimeMs - a.mtimeMs);
+    for (let i = 0; i < groups[g].length; i++) {
+      const item = groups[g][i];
+      const ageMs = input.now - item.mtimeMs;
+      if (i >= topK && ageMs > ttlMs) {
+        try {
+          await fs.promises.rm(item.abs, { recursive: true, force: true });
+        } catch {}
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@ import { is } from "@electron-toolkit/utils";
 import { initDb, getDb } from "./db";
 import { setupIpc } from "./ipc";
 import { resolveLocalAssetRequest } from "./localProtocol";
-import { applyPendingRestoreIfPresent } from "./backupRestore";
+import { applyPendingRestoreIfPresent, cleanupRestoreArtifacts } from "./backupRestore";
 import fs from "fs";
 
 let mainWindow: BrowserWindow | null = null;
@@ -63,10 +63,17 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  const userDataPath = app.getPath("userData");
   try {
-    await applyPendingRestoreIfPresent({ userDataPath: app.getPath("userData"), now: Date.now() });
+    await applyPendingRestoreIfPresent({ userDataPath, now: Date.now() });
   } catch (e) {
     console.error("Apply pending restore failed:", e);
+  }
+
+  try {
+    await cleanupRestoreArtifacts({ userDataPath, now: Date.now() });
+  } catch (e) {
+    console.error("Cleanup restore artifacts failed:", e);
   }
 
   initDb();
