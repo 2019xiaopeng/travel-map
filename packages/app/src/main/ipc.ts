@@ -7,6 +7,7 @@ import { app } from "electron";
 import { saveAssetBytesCore } from "./saveAssetBytesCore";
 import { createBackupZip } from "./backupZip";
 import { stageRestoreFromZip } from "./backupRestore";
+import { exportRestoreDiagnostic } from "./diagnostics/restoreDiagnostics.ts";
 
 export function setupIpc() {
   const assertSender = (event: Electron.IpcMainInvokeEvent) => {
@@ -689,6 +690,32 @@ export function setupIpc() {
     app.relaunch();
     app.exit(0);
     return { ok: true };
+  });
+
+  ipcMain.handle("diagnostics:exportRestoreDiagnostic", async (event, payload: { reason?: string } | undefined) => {
+    assertSender(event);
+    const res = await exportRestoreDiagnostic({ reason: String(payload?.reason ?? "manual") });
+    if (!res.ok) return { error: res.error };
+    return { ok: true, relativePath: res.relativePath };
+  });
+
+  ipcMain.handle("diagnostics:reveal", async (event, payload: { relativePath: string }) => {
+    assertSender(event);
+    try {
+      const userDataPath = app.getPath("userData");
+      const rel = String(payload?.relativePath ?? "").replace(/\\/g, "/");
+      if (!rel || path.isAbsolute(rel)) return { error: "Access Denied" };
+
+      const abs = path.resolve(path.join(userDataPath, rel));
+      const allowedRoots = [path.resolve(path.join(userDataPath, "diagnostics")), path.resolve(path.join(userDataPath, "logs"))];
+      const ok = allowedRoots.some((root) => abs === root || abs.startsWith(root + path.sep));
+      if (!ok) return { error: "Access Denied" };
+
+      shell.showItemInFolder(abs);
+      return { ok: true };
+    } catch (e: any) {
+      return { error: e.message };
+    }
   });
 
   ipcMain.handle("file:openLocal", async (event, payload: { localPath: string }) => {

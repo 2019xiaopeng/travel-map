@@ -52,7 +52,11 @@ const api = {
     exportBackupZip: () => ipcRenderer.invoke("file:exportBackupZip"),
     importBackupZip: () => ipcRenderer.invoke("file:importBackupZip"),
     openLocal: (localPath: string) => ipcRenderer.invoke("file:openLocal", { localPath }),
-  }
+  },
+  diagnostics: {
+    exportRestoreDiagnostic: (payload?: { reason?: string }) => ipcRenderer.invoke("diagnostics:exportRestoreDiagnostic", payload),
+    reveal: (relativePath: string) => ipcRenderer.invoke("diagnostics:reveal", { relativePath }),
+  },
 };
 
 contextBridge.exposeInMainWorld("travelMap", api);

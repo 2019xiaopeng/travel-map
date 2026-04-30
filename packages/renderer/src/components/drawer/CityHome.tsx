@@ -180,6 +180,28 @@ export function CityHome({ cityId, cityName, provinceId, provinceName }: CityHom
           导入备份（zip）
         </button>
       </div>
+
+      <div className="pt-2 flex justify-end">
+        <button
+          onClick={async () => {
+            try {
+              const res = await window.travelMap.diagnostics.exportRestoreDiagnostic({ reason: "manual" });
+              if (res?.ok && res.relativePath) {
+                await window.travelMap.diagnostics.reveal(res.relativePath);
+                ui.toast.success(`诊断已导出：${res.relativePath}`);
+              } else {
+                ui.toast.error(res?.error || "导出诊断失败");
+              }
+            } catch (err: any) {
+              console.error("导出诊断失败", err);
+              ui.toast.error("导出诊断失败");
+            }
+          }}
+          className="text-xs text-neutral-400 hover:text-white"
+        >
+          导出诊断
+        </button>
+      </div>
     </div>
   );
 }
