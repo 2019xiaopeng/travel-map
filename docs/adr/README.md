@@ -38,3 +38,5 @@
 - [ADR-0034 备份恢复更强硬化（单文件上限、可疑路径拒绝、apply 原子性/回滚）](file:///workspace/docs/adr/ADR-0034-backup-restore-atomicity-and-entry-limits.md)
 - [ADR-0035 备份恢复 apply 事务化（崩溃可自愈 / 强幂等）](file:///workspace/docs/adr/ADR-0035-backup-restore-transactional-apply.md)
 - [ADR-0036 Restore Transaction 恢复矩阵（phase × 磁盘状态 → 行为）](file:///workspace/docs/adr/ADR-0036-backup-restore-transaction-recovery-matrix.md)
+- [ADR-0037 Restore Transaction 路径信任边界与强校验](file:///workspace/docs/adr/ADR-0037-restore-transaction-path-trust-boundary.md)
+- [ADR-0038 Restore 产物 retention 清理策略（.bak / .failed）](file:///workspace/docs/adr/ADR-0038-restore-artifacts-retention-cleanup.md)
