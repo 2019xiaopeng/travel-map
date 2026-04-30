@@ -3,18 +3,51 @@ import path from "path";
 import yauzl from "yauzl";
 import crypto from "crypto";
 
+const DEFAULT_RETENTION = {
+  failed: {
+    ttlMs: 7 * 24 * 3600_000,
+    topK: 3,
+    envTtl: "TRAVEL_MAP_RETENTION_FAILED_TTL_MS",
+    envTopK: "TRAVEL_MAP_RETENTION_FAILED_TOPK",
+  },
+  dbBak: {
+    ttlMs: 30 * 24 * 3600_000,
+    topK: 5,
+    envTtl: "TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS",
+    envTopK: "TRAVEL_MAP_RETENTION_DB_BAK_TOPK",
+  },
+  assetsBak: {
+    ttlMs: 30 * 24 * 3600_000,
+    topK: 3,
+    envTtl: "TRAVEL_MAP_RETENTION_ASSETS_BAK_TTL_MS",
+    envTopK: "TRAVEL_MAP_RETENTION_ASSETS_BAK_TOPK",
+  },
+} as const;
+
 function envNumber(name: string, fallback: number) {
   const v = Number(process.env[name]);
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-function envMs(name: string, fallback: number) {
-  const v = Number(process.env[name]);
+function envNonEmptyString(name: string) {
+  const raw = process.env[name];
+  if (raw === undefined) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  return trimmed;
+}
+
+function envMsWithDefault(name: string, fallback: number) {
+  const raw = envNonEmptyString(name);
+  if (raw === null) return fallback;
+  const v = Number(raw);
   return Number.isFinite(v) && v >= 0 ? v : fallback;
 }
 
-function envInt(name: string, fallback: number) {
-  const v = Number(process.env[name]);
+function envIntWithDefault(name: string, fallback: number) {
+  const raw = envNonEmptyString(name);
+  if (raw === null) return fallback;
+  const v = Number(raw);
   return Number.isFinite(v) && Number.isInteger(v) && v >= 0 ? v : fallback;
 }
 
@@ -531,22 +564,17 @@ export async function cleanupRestoreArtifacts(input: { userDataPath: string; now
     return;
   }
 
-  const cfg = {
-    failed: {
-      ttlMs: envMs("TRAVEL_MAP_RETENTION_FAILED_TTL_MS", 7 * 24 * 3600_000),
-      topK: envInt("TRAVEL_MAP_RETENTION_FAILED_TOPK", 3),
-    },
-    dbBak: {
-      ttlMs: envMs("TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS", 30 * 24 * 3600_000),
-      topK: envInt("TRAVEL_MAP_RETENTION_DB_BAK_TOPK", 5),
-    },
-    assetsBak: {
-      ttlMs: envMs("TRAVEL_MAP_RETENTION_ASSETS_BAK_TTL_MS", 30 * 24 * 3600_000),
-      topK: envInt("TRAVEL_MAP_RETENTION_ASSETS_BAK_TOPK", 3),
-    },
-  };
+  type RetentionGroup = keyof typeof DEFAULT_RETENTION;
+  const cfg = {} as Record<RetentionGroup, { ttlMs: number; topK: number }>;
+  for (const g of Object.keys(DEFAULT_RETENTION) as Array<RetentionGroup>) {
+    const d = DEFAULT_RETENTION[g];
+    cfg[g] = {
+      ttlMs: envMsWithDefault(d.envTtl, d.ttlMs),
+      topK: envIntWithDefault(d.envTopK, d.topK),
+    };
+  }
 
-  const groups: Record<"failed" | "dbBak" | "assetsBak", Array<{ abs: string; mtimeMs: number }>> = {
+  const groups: Record<RetentionGroup, Array<{ abs: string; mtimeMs: number }>> = {
     failed: [],
     dbBak: [],
     assetsBak: [],
