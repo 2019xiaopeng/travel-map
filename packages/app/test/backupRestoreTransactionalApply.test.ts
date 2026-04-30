@@ -157,3 +157,59 @@ test("applyPendingRestoreIfPresent swaps staged assets even if currentAssets alr
   assert.equal(fs.existsSync(path.join(currentAssets, "cities/new/b.txt")), true);
   assert.equal(fs.existsSync(path.join(currentAssets, "cities/old/a.txt")), false);
 });
+
+test("applyPendingRestoreIfPresent rejects tx paths outside userData and does not touch external files", async () => {
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-apply-tx-"));
+  const userDataPath = path.join(tmp, "userData");
+  await fs.promises.mkdir(userDataPath, { recursive: true });
+
+  const outsideDir = path.join(tmp, "outside");
+  await fs.promises.mkdir(outsideDir, { recursive: true });
+  const outsideFile = path.join(outsideDir, "outside.sqlite");
+  await fs.promises.writeFile(outsideFile, "DO-NOT-TOUCH", "utf8");
+
+  const stagingPath = path.join(userDataPath, "restore-staging-1");
+  await fs.promises.mkdir(path.join(stagingPath, "assets"), { recursive: true });
+  await fs.promises.writeFile(path.join(stagingPath, "travel-map.sqlite"), "new-db", "utf8");
+
+  await writeJson(path.join(userDataPath, "restore-pending.json"), { stagingPath });
+  await writeJson(path.join(userDataPath, "restore-transaction.json"), {
+    version: 1,
+    now: 1,
+    stagingPath,
+    phase: "db_swapped",
+    paths: {
+      currentDb: outsideFile,
+      currentAssets: path.join(tmp, "outside-assets"),
+      dbBak: path.join(tmp, "outside-bak"),
+      assetsBak: path.join(tmp, "outside-assets-bak"),
+    },
+  });
+
+  const applied = await applyPendingRestoreIfPresent({ userDataPath, now: 2 });
+  assert.equal(applied, false);
+  assert.equal(await fs.promises.readFile(outsideFile, "utf8"), "DO-NOT-TOUCH");
+  assert.equal(fs.existsSync(path.join(userDataPath, "restore-transaction.json")), false);
+});
+
+test("applyPendingRestoreIfPresent clears tx when phase is invalid", async () => {
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-apply-tx-"));
+  const userDataPath = path.join(tmp, "userData");
+  await fs.promises.mkdir(userDataPath, { recursive: true });
+
+  const stagingPath = path.join(userDataPath, "restore-staging-1");
+  await fs.promises.mkdir(path.join(stagingPath, "assets"), { recursive: true });
+  await fs.promises.writeFile(path.join(stagingPath, "travel-map.sqlite"), "db", "utf8");
+
+  await writeJson(path.join(userDataPath, "restore-pending.json"), { stagingPath });
+  await writeJson(path.join(userDataPath, "restore-transaction.json"), {
+    version: 1,
+    now: 1,
+    stagingPath,
+    phase: "unknown",
+  });
+
+  const applied = await applyPendingRestoreIfPresent({ userDataPath, now: 2 });
+  assert.equal(applied, false);
+  assert.equal(fs.existsSync(path.join(userDataPath, "restore-transaction.json")), false);
+});
