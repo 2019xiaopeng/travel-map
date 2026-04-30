@@ -76,6 +76,14 @@ function ensureDir(absDir: string) {
   return fs.promises.mkdir(absDir, { recursive: true });
 }
 
+async function isSymlinkPath(p: string) {
+  try {
+    return (await fs.promises.lstat(p)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 function safeJoin(baseDir: string, rel: string) {
   const normalized = rel.replace(/^\/+/, "");
   const abs = path.resolve(path.join(baseDir, normalized));
@@ -337,6 +345,7 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
       }
     }
 
+    if (await isSymlinkPath(pendingPath)) throw new Error("unsafe pending path");
     await fs.promises.writeFile(pendingPath, JSON.stringify({ stagingPath }, null, 2), "utf8");
 
     return { ok: true as const, stagingPath, warnings };
@@ -356,6 +365,21 @@ export async function applyPendingRestoreIfPresent(input: { userDataPath: string
     event: "restore.apply.check",
     meta: { has_transaction: fs.existsSync(txPath), has_pending: fs.existsSync(pendingPath) },
   });
+  const txIsSymlink = await isSymlinkPath(txPath);
+  const pendingIsSymlink = await isSymlinkPath(pendingPath);
+  if (txIsSymlink || pendingIsSymlink) {
+    if (txIsSymlink) {
+      try {
+        await fs.promises.unlink(txPath);
+      } catch {}
+    }
+    if (pendingIsSymlink) {
+      try {
+        await fs.promises.unlink(pendingPath);
+      } catch {}
+    }
+    return false;
+  }
   if (fs.existsSync(txPath)) {
     return await applyRestoreTransaction({ userDataPath: input.userDataPath, txPath, pendingPath });
   }

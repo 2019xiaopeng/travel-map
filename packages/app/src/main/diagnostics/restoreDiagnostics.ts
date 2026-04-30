@@ -24,9 +24,17 @@ let writeChain: Promise<void> = Promise.resolve();
 let logMaxBytes = 1024 * 1024;
 const logKeepCount = 3;
 
+const DEFAULT_RETENTION = {
+  failed: { ttlMs: 7 * 24 * 3600_000, topK: 3, envTtl: "TRAVEL_MAP_RETENTION_FAILED_TTL_MS", envTopK: "TRAVEL_MAP_RETENTION_FAILED_TOPK" },
+  dbBak: { ttlMs: 30 * 24 * 3600_000, topK: 5, envTtl: "TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS", envTopK: "TRAVEL_MAP_RETENTION_DB_BAK_TOPK" },
+  assetsBak: { ttlMs: 30 * 24 * 3600_000, topK: 3, envTtl: "TRAVEL_MAP_RETENTION_ASSETS_BAK_TTL_MS", envTopK: "TRAVEL_MAP_RETENTION_ASSETS_BAK_TOPK" },
+} as const;
+
 export function initRestoreDiagnostics(input: { userDataPath: string; appVersion: string }) {
   userDataPath = input.userDataPath;
   appVersion = input.appVersion;
+  ring = [];
+  writeChain = Promise.resolve();
 }
 
 export function getRestoreLogRelativePath() {
@@ -74,6 +82,8 @@ async function ensureSafeDir(absDir: string) {
     if (e?.code !== "ENOENT") throw e;
   }
   await fs.promises.mkdir(absDir, { recursive: true });
+  const st = await fs.promises.lstat(absDir);
+  if (st.isSymbolicLink() || !st.isDirectory()) throw new Error("unsafe_dir");
 }
 
 async function rotateIfNeeded(absLogPath: string, incomingBytes: number) {
@@ -115,6 +125,43 @@ function sanitizeMessage(message: string | undefined) {
   return message;
 }
 
+function sanitizeMeta(value: any, depth = 0): any {
+  if (value == null) return value;
+  if (depth > 4) return "<redacted>";
+  if (typeof value === "string") return /[\\/]/.test(value) ? "<redacted>" : value;
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.slice(0, 50).map((v) => sanitizeMeta(v, depth + 1));
+  if (typeof value === "object") {
+    const out: any = {};
+    const keys = Object.keys(value).slice(0, 50);
+    for (const k of keys) out[k] = sanitizeMeta((value as any)[k], depth + 1);
+    return out;
+  }
+  return "<redacted>";
+}
+
+function envMs(name: string, fallback: number) {
+  const raw = process.env[name];
+  if (typeof raw !== "string" || raw.trim() === "") return fallback;
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
+function envInt(name: string, fallback: number) {
+  const raw = process.env[name];
+  if (typeof raw !== "string" || raw.trim() === "") return fallback;
+  const v = Number(raw);
+  return Number.isFinite(v) && Number.isInteger(v) && v >= 0 ? v : fallback;
+}
+
+function getRetentionSnapshot() {
+  return {
+    failed: { ttlMs: envMs(DEFAULT_RETENTION.failed.envTtl, DEFAULT_RETENTION.failed.ttlMs), topK: envInt(DEFAULT_RETENTION.failed.envTopK, DEFAULT_RETENTION.failed.topK) },
+    dbBak: { ttlMs: envMs(DEFAULT_RETENTION.dbBak.envTtl, DEFAULT_RETENTION.dbBak.ttlMs), topK: envInt(DEFAULT_RETENTION.dbBak.envTopK, DEFAULT_RETENTION.dbBak.topK) },
+    assetsBak: { ttlMs: envMs(DEFAULT_RETENTION.assetsBak.envTtl, DEFAULT_RETENTION.assetsBak.ttlMs), topK: envInt(DEFAULT_RETENTION.assetsBak.envTopK, DEFAULT_RETENTION.assetsBak.topK) },
+  };
+}
+
 export function logRestoreEvent(input: {
   level: LogLevel;
   event: string;
@@ -133,7 +180,7 @@ export function logRestoreEvent(input: {
     error_code: input.error_code,
     message: sanitizeMessage(input.message),
     paths: input.paths?.map((p) => sanitizePath(p)),
-    meta: input.meta,
+    meta: sanitizeMeta(input.meta),
   };
 
   ring = [...ring, e].slice(-ringMax);
@@ -189,6 +236,7 @@ export async function exportRestoreDiagnostic(input: { reason: string }) {
       pending: pending ? { stagingPath: pendingStaging } : null,
       transaction: tx ? { version: tx.version, phase: tx.phase, stagingPath: txStaging } : null,
     },
+    retention: getRetentionSnapshot(),
     recent_events: ring.slice(-ringMax),
   };
 

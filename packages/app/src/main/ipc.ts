@@ -8,6 +8,7 @@ import { saveAssetBytesCore } from "./saveAssetBytesCore";
 import { createBackupZip } from "./backupZip";
 import { stageRestoreFromZip } from "./backupRestore";
 import { exportRestoreDiagnostic } from "./diagnostics/restoreDiagnostics.ts";
+import { resolveDiagnosticsRevealAbsolutePath } from "./diagnostics/diagnosticsPaths.ts";
 
 export function setupIpc() {
   const assertSender = (event: Electron.IpcMainInvokeEvent) => {
@@ -703,15 +704,9 @@ export function setupIpc() {
     assertSender(event);
     try {
       const userDataPath = app.getPath("userData");
-      const rel = String(payload?.relativePath ?? "").replace(/\\/g, "/");
-      if (!rel || path.isAbsolute(rel)) return { error: "Access Denied" };
-
-      const abs = path.resolve(path.join(userDataPath, rel));
-      const allowedRoots = [path.resolve(path.join(userDataPath, "diagnostics")), path.resolve(path.join(userDataPath, "logs"))];
-      const ok = allowedRoots.some((root) => abs === root || abs.startsWith(root + path.sep));
-      if (!ok) return { error: "Access Denied" };
-
-      shell.showItemInFolder(abs);
+      const res = await resolveDiagnosticsRevealAbsolutePath({ userDataPath, relativePath: payload?.relativePath });
+      if (!res.ok) return { error: res.error };
+      shell.showItemInFolder(res.abs);
       return { ok: true };
     } catch (e: any) {
       return { error: e.message };
