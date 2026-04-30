@@ -38,3 +38,27 @@ test("stageRestoreFromZip fails when db.sqlite missing and does not write pendin
 
   assert.equal(fs.existsSync(path.join(userDataPath, "restore-pending.json")), false);
 });
+
+test("stageRestoreFromZip rejects when restore-pending.json is a symlink", async () => {
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-restore-"));
+  const userDataPath = path.join(tmp, "userData");
+  await fs.promises.mkdir(userDataPath, { recursive: true });
+
+  const outside = path.join(tmp, "outside.txt");
+  await fs.promises.writeFile(outside, "DO-NOT-TOUCH", "utf8");
+  await fs.promises.symlink(outside, path.join(userDataPath, "restore-pending.json"));
+
+  const zipPath = path.join(tmp, "backup.zip");
+  await createZip(zipPath, [
+    { name: "manifest.json", content: Buffer.from(`{\"exported_at\":1,\"app_version\":\"0\",\"assets\":[],\"warnings\":[]}`) },
+    { name: "db.sqlite", content: Buffer.from("db") },
+    { name: "assets/cities/1/a.txt", content: Buffer.from("a") },
+  ]);
+
+  await assert.rejects(
+    () => stageRestoreFromZip({ zipPath, userDataPath, now: 1 }),
+    /unsafe pending path/i,
+  );
+
+  assert.equal(await fs.promises.readFile(outside, "utf8"), "DO-NOT-TOUCH");
+});

@@ -192,6 +192,24 @@ test("applyPendingRestoreIfPresent rejects tx paths outside userData and does no
   assert.equal(fs.existsSync(path.join(userDataPath, "restore-transaction.json")), false);
 });
 
+test("applyPendingRestoreIfPresent clears tx/pending when those files are symlinks", async () => {
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-apply-tx-"));
+  const userDataPath = path.join(tmp, "userData");
+  await fs.promises.mkdir(userDataPath, { recursive: true });
+
+  const outside = path.join(tmp, "outside.txt");
+  await fs.promises.writeFile(outside, "DO-NOT-TOUCH", "utf8");
+
+  await fs.promises.symlink(outside, path.join(userDataPath, "restore-transaction.json"));
+  await fs.promises.symlink(outside, path.join(userDataPath, "restore-pending.json"));
+
+  const applied = await applyPendingRestoreIfPresent({ userDataPath, now: 1 });
+  assert.equal(applied, false);
+  assert.equal(fs.existsSync(path.join(userDataPath, "restore-transaction.json")), false);
+  assert.equal(fs.existsSync(path.join(userDataPath, "restore-pending.json")), false);
+  assert.equal(await fs.promises.readFile(outside, "utf8"), "DO-NOT-TOUCH");
+});
+
 test("applyPendingRestoreIfPresent preserves staging as .failed when tx paths are invalid", async () => {
   const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-apply-tx-"));
   const userDataPath = path.join(tmp, "userData");

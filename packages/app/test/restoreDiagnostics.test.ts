@@ -82,6 +82,48 @@ test("restoreDiagnostics redacts messages that may contain paths", async () => {
   assert.equal(parsed.message, "<redacted>");
 });
 
+test("exportRestoreDiagnostic includes retention cfg snapshot", async () => {
+  const prevTopK = process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK;
+  const prevTtl = process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS;
+  process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK = "0";
+  process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS = "1";
+
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-restore-diag-"));
+  const userDataPath = path.join(tmp, "userData");
+  await fs.promises.mkdir(userDataPath, { recursive: true });
+
+  try {
+    initRestoreDiagnostics({ userDataPath, appVersion: "0-test" });
+    const r = await exportRestoreDiagnostic({ reason: "test" });
+    assert.equal(r.ok, true);
+    const abs = path.join(userDataPath, r.relativePath!);
+    const json = JSON.parse(await fs.promises.readFile(abs, "utf8"));
+    assert.equal(json.retention?.dbBak?.topK, 0);
+    assert.equal(json.retention?.dbBak?.ttlMs, 1);
+  } finally {
+    if (prevTopK === undefined) delete process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK;
+    else process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK = prevTopK;
+    if (prevTtl === undefined) delete process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS;
+    else process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS = prevTtl;
+  }
+});
+
+test("restoreDiagnostics redacts path-like strings inside meta", async () => {
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-restore-diag-"));
+  const userDataPath = path.join(tmp, "userData");
+  await fs.promises.mkdir(userDataPath, { recursive: true });
+
+  initRestoreDiagnostics({ userDataPath, appVersion: "0-test" });
+  logRestoreEvent({ level: "info", event: "test", meta: { p: path.join(userDataPath, "x.txt") } });
+  await flushRestoreDiagnosticsForTest();
+
+  const logPath = path.join(userDataPath, getRestoreLogRelativePath());
+  const content = await fs.promises.readFile(logPath, "utf8");
+  const line = content.trim().split("\n").slice(-1)[0];
+  const parsed = JSON.parse(line);
+  assert.equal(parsed.meta.p, "<redacted>");
+});
+
 test("restoreDiagnostics refuses to write when logs directory is a symlink", async () => {
   const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-restore-diag-"));
   const userDataPath = path.join(tmp, "userData");
