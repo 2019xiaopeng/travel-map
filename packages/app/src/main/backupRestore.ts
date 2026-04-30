@@ -406,6 +406,16 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
   const assetsBak = await validateBakPath("assets", input.userDataPath, candidateAssetsBak);
   if (!dbBak || !assetsBak) {
     try {
+      await fs.promises.unlink(input.pendingPath);
+    } catch {}
+    try {
+      const st = await fs.promises.lstat(stagingPath);
+      if (!st.isSymbolicLink()) {
+        const failed = uniquePath(`${stagingPath}.failed`);
+        await fs.promises.rename(stagingPath, failed);
+      }
+    } catch {}
+    try {
       await fs.promises.unlink(input.txPath);
     } catch {}
     return false;
