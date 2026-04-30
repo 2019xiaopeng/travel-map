@@ -411,6 +411,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     return false;
   }
 
+
   const stagedDb = path.join(stagingPath, "travel-map.sqlite");
   const stagedAssets = path.join(stagingPath, "assets");
 
@@ -510,8 +511,11 @@ export async function cleanupRestoreArtifacts(input: { userDataPath: string; now
     return;
   }
 
-  const ttlMs = 7 * 24 * 3600_000;
-  const topK = 3;
+  const cfg = {
+    failed: { ttlMs: 7 * 24 * 3600_000, topK: 3 },
+    dbBak: { ttlMs: 30 * 24 * 3600_000, topK: 5 },
+    assetsBak: { ttlMs: 30 * 24 * 3600_000, topK: 3 },
+  } as const;
 
   const groups: Record<"failed" | "dbBak" | "assetsBak", Array<{ abs: string; mtimeMs: number }>> = {
     failed: [],
@@ -540,6 +544,7 @@ export async function cleanupRestoreArtifacts(input: { userDataPath: string; now
 
   for (const g of Object.keys(groups) as Array<keyof typeof groups>) {
     groups[g].sort((a, b) => b.mtimeMs - a.mtimeMs);
+    const { ttlMs, topK } = cfg[g];
     for (let i = 0; i < groups[g].length; i++) {
       const item = groups[g][i];
       const ageMs = input.now - item.mtimeMs;
