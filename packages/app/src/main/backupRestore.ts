@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import yauzl from "yauzl";
 import crypto from "crypto";
+import { exportRestoreDiagnostic, logRestoreEvent } from "./diagnostics/restoreDiagnostics.ts";
 
 const DEFAULT_RETENTION = {
   failed: {
@@ -350,6 +351,11 @@ export async function stageRestoreFromZip(input: { zipPath: string; userDataPath
 export async function applyPendingRestoreIfPresent(input: { userDataPath: string; now: number }) {
   const txPath = path.join(input.userDataPath, "restore-transaction.json");
   const pendingPath = path.join(input.userDataPath, "restore-pending.json");
+  logRestoreEvent({
+    level: "info",
+    event: "restore.apply.check",
+    meta: { has_transaction: fs.existsSync(txPath), has_pending: fs.existsSync(pendingPath) },
+  });
   if (fs.existsSync(txPath)) {
     return await applyRestoreTransaction({ userDataPath: input.userDataPath, txPath, pendingPath });
   }
@@ -408,6 +414,7 @@ export async function applyPendingRestoreIfPresent(input: { userDataPath: string
 }
 
 async function applyRestoreTransaction(input: { userDataPath: string; txPath: string; pendingPath: string }) {
+  logRestoreEvent({ level: "info", event: "restore.apply.start" });
   let tx: any;
   try {
     tx = await readJson(input.txPath);
@@ -415,6 +422,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     try {
       await fs.promises.unlink(input.txPath);
     } catch {}
+    logRestoreEvent({ level: "warn", event: "restore.apply.invalid_tx", error_code: "tx_parse_failed" });
     return false;
   }
 
@@ -425,6 +433,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     try {
       await fs.promises.unlink(input.txPath);
     } catch {}
+    logRestoreEvent({ level: "warn", event: "restore.apply.invalid_tx", error_code: "tx_schema_invalid", phase });
     return false;
   }
 
@@ -437,6 +446,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     try {
       await fs.promises.unlink(input.txPath);
     } catch {}
+    logRestoreEvent({ level: "warn", event: "restore.apply.invalid_tx", error_code: "staging_invalid", paths: [stagingPath] });
     return false;
   }
 
@@ -461,6 +471,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     try {
       await fs.promises.unlink(input.txPath);
     } catch {}
+    logRestoreEvent({ level: "warn", event: "restore.apply.invalid_tx", error_code: "bak_invalid", paths: [stagingPath] });
     return false;
   }
 
@@ -470,6 +481,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
 
   try {
     if (phase === "init") {
+      logRestoreEvent({ level: "info", event: "restore.apply.phase", phase: "init", paths: [stagingPath] });
       if (fs.existsSync(currentDb) && !fs.existsSync(dbBak)) await fs.promises.rename(currentDb, dbBak);
       if (fs.existsSync(currentAssets) && !fs.existsSync(assetsBak)) await fs.promises.rename(currentAssets, assetsBak);
       tx.phase = "backed_up";
@@ -478,6 +490,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     }
 
     if (tx.phase === "backed_up") {
+      logRestoreEvent({ level: "info", event: "restore.apply.phase", phase: "backed_up", paths: [stagingPath] });
       if (!fs.existsSync(currentDb) && !fs.existsSync(stagedDb) && fs.existsSync(dbBak)) {
         throw new Error("staged db missing");
       }
@@ -493,6 +506,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     }
 
     if (tx.phase === "db_swapped") {
+      logRestoreEvent({ level: "info", event: "restore.apply.phase", phase: "db_swapped", paths: [stagingPath] });
       if (!fs.existsSync(currentAssets) && !fs.existsSync(stagedAssets) && fs.existsSync(assetsBak)) {
         throw new Error("staged assets missing");
       }
@@ -508,6 +522,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     }
 
     if (tx.phase === "assets_swapped") {
+      logRestoreEvent({ level: "info", event: "restore.apply.phase", phase: "assets_swapped", paths: [stagingPath] });
       try {
         await fs.promises.unlink(input.pendingPath);
       } catch {}
@@ -516,6 +531,7 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     }
 
     if (tx.phase === "committed") {
+      logRestoreEvent({ level: "info", event: "restore.apply.phase", phase: "committed", paths: [stagingPath] });
       try {
         await fs.promises.rm(stagingPath, { recursive: true, force: true });
       } catch {}
@@ -527,11 +543,20 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
       try {
         await fs.promises.unlink(input.txPath);
       } catch {}
+      logRestoreEvent({ level: "info", event: "restore.apply.success", paths: [stagingPath] });
       return true;
     }
 
     return false;
-  } catch {
+  } catch (e) {
+    logRestoreEvent({
+      level: "error",
+      event: "restore.apply.fail",
+      error_code: "exception",
+      message: String((e as any)?.message ?? "unknown"),
+      paths: [stagingPath],
+    });
+    await exportRestoreDiagnostic({ reason: "restore.apply.fail" });
     try {
       if (fs.existsSync(dbBak) && !fs.existsSync(currentDb)) await fs.promises.rename(dbBak, currentDb);
     } catch {}
@@ -573,6 +598,7 @@ export async function cleanupRestoreArtifacts(input: { userDataPath: string; now
       topK: envIntWithDefault(d.envTopK, d.topK),
     };
   }
+  logRestoreEvent({ level: "info", event: "restore.cleanup.start", meta: { cfg } });
 
   const groups: Record<RetentionGroup, Array<{ abs: string; mtimeMs: number }>> = {
     failed: [],
@@ -604,14 +630,18 @@ export async function cleanupRestoreArtifacts(input: { userDataPath: string; now
   for (const g of Object.keys(groups) as Array<keyof typeof groups>) {
     groups[g].sort((a, b) => b.mtimeMs - a.mtimeMs);
     const { ttlMs, topK } = cfg[g];
+    let removed = 0;
     for (let i = 0; i < groups[g].length; i++) {
       const item = groups[g][i];
       const ageMs = input.now - item.mtimeMs;
       if (i >= topK && ageMs > ttlMs) {
         try {
           await fs.promises.rm(item.abs, { recursive: true, force: true });
+          removed++;
         } catch {}
       }
     }
+    if (removed) logRestoreEvent({ level: "info", event: "restore.cleanup.removed", meta: { group: g, removed } });
   }
+  logRestoreEvent({ level: "info", event: "restore.cleanup.done" });
 }

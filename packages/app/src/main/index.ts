@@ -5,6 +5,7 @@ import { initDb, getDb } from "./db";
 import { setupIpc } from "./ipc";
 import { resolveLocalAssetRequest } from "./localProtocol";
 import { applyPendingRestoreIfPresent, cleanupRestoreArtifacts } from "./backupRestore";
+import { exportRestoreDiagnostic, initRestoreDiagnostics, logRestoreEvent } from "./diagnostics/restoreDiagnostics.ts";
 import fs from "fs";
 
 let mainWindow: BrowserWindow | null = null;
@@ -64,16 +65,21 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   const userDataPath = app.getPath("userData");
+  initRestoreDiagnostics({ userDataPath, appVersion: app.getVersion() });
   try {
     await applyPendingRestoreIfPresent({ userDataPath, now: Date.now() });
   } catch (e) {
     console.error("Apply pending restore failed:", e);
+    logRestoreEvent({ level: "error", event: "restore.apply.fail", error_code: "exception", message: String((e as any)?.message ?? "unknown") });
+    await exportRestoreDiagnostic({ reason: "restore.apply.fail" });
   }
 
   try {
     await cleanupRestoreArtifacts({ userDataPath, now: Date.now() });
   } catch (e) {
     console.error("Cleanup restore artifacts failed:", e);
+    logRestoreEvent({ level: "error", event: "restore.cleanup.fail", error_code: "exception", message: String((e as any)?.message ?? "unknown") });
+    await exportRestoreDiagnostic({ reason: "restore.cleanup.fail" });
   }
 
   initDb();
