@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "fs";
+import net from "node:net";
 import os from "os";
 import path from "path";
 
@@ -88,6 +89,82 @@ test("cleanupRestoreArtifacts deletes old assets bak beyond topK and TTL", async
   assert.equal(names.has("assets.bak-2"), false);
   assert.equal(names.has("assets.bak-1"), false);
 });
+
+test("cleanupRestoreArtifacts supports env overrides for dbBak retention", async () => {
+  const prevTtl = process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS;
+  const prevTopK = process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK;
+  process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS = "1";
+  process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK = "0";
+
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));
+  const userDataPath = path.join(tmp, "userData");
+  await fs.promises.mkdir(userDataPath, { recursive: true });
+  const now = Date.now();
+
+  const mkFile = async (name: string, ageMs: number) => {
+    const p = path.join(userDataPath, name);
+    await fs.promises.writeFile(p, "x", "utf8");
+    const t = new Date(now - ageMs);
+    await fs.promises.utimes(p, t, t);
+  };
+
+  await mkFile("travel-map.sqlite.bak-1", 10);
+  await mkFile("travel-map.sqlite.bak-2", 10);
+
+  try {
+    await cleanupRestoreArtifacts({ userDataPath, now });
+    const names = await fs.promises.readdir(userDataPath);
+    assert.equal(names.some((n) => n.startsWith("travel-map.sqlite.bak-")), false);
+  } finally {
+    if (prevTtl === undefined) delete process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS;
+    else process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS = prevTtl;
+    if (prevTopK === undefined) delete process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK;
+    else process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK = prevTopK;
+  }
+});
+
+test(
+  "cleanupRestoreArtifacts skips unix socket even if name matches dbBak pattern",
+  { skip: process.platform === "win32" },
+  async () => {
+    const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));
+    const userDataPath = path.join(tmp, "userData");
+    await fs.promises.mkdir(userDataPath, { recursive: true });
+
+    const now = Date.now();
+
+    const mkFile = async (name: string, ageDays: number) => {
+      const p = path.join(userDataPath, name);
+      await fs.promises.writeFile(p, "x", "utf8");
+      const t = new Date(now - ageDays * 24 * 3600_000);
+      await fs.promises.utimes(p, t, t);
+    };
+
+    for (let i = 1; i <= 5; i++) {
+      await mkFile(`travel-map.sqlite.bak-${i}`, 60 + (5 - i));
+    }
+
+    const sockPath = path.join(userDataPath, "travel-map.sqlite.bak-999");
+    const server = net.createServer();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(sockPath, () => resolve());
+      });
+      await fs.promises.utimes(sockPath, new Date(now - 120 * 24 * 3600_000), new Date(now - 120 * 24 * 3600_000));
+
+      await cleanupRestoreArtifacts({ userDataPath, now });
+
+      const st = await fs.promises.lstat(sockPath);
+      assert.equal(st.isSocket(), true);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      try {
+        await fs.promises.unlink(sockPath);
+      } catch {}
+    }
+  },
+);
 
 test("cleanupRestoreArtifacts does not delete bak when within TTL even if beyond topK", async () => {
   const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));

@@ -8,6 +8,16 @@ function envNumber(name: string, fallback: number) {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
+function envMs(name: string, fallback: number) {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
+function envInt(name: string, fallback: number) {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && Number.isInteger(v) && v >= 0 ? v : fallback;
+}
+
 function maxRelevantZipEntries() {
   return envNumber("TRAVEL_MAP_MAX_RELEVANT_ZIP_ENTRIES", 20000);
 }
@@ -522,10 +532,19 @@ export async function cleanupRestoreArtifacts(input: { userDataPath: string; now
   }
 
   const cfg = {
-    failed: { ttlMs: 7 * 24 * 3600_000, topK: 3 },
-    dbBak: { ttlMs: 30 * 24 * 3600_000, topK: 5 },
-    assetsBak: { ttlMs: 30 * 24 * 3600_000, topK: 3 },
-  } as const;
+    failed: {
+      ttlMs: envMs("TRAVEL_MAP_RETENTION_FAILED_TTL_MS", 7 * 24 * 3600_000),
+      topK: envInt("TRAVEL_MAP_RETENTION_FAILED_TOPK", 3),
+    },
+    dbBak: {
+      ttlMs: envMs("TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS", 30 * 24 * 3600_000),
+      topK: envInt("TRAVEL_MAP_RETENTION_DB_BAK_TOPK", 5),
+    },
+    assetsBak: {
+      ttlMs: envMs("TRAVEL_MAP_RETENTION_ASSETS_BAK_TTL_MS", 30 * 24 * 3600_000),
+      topK: envInt("TRAVEL_MAP_RETENTION_ASSETS_BAK_TOPK", 3),
+    },
+  };
 
   const groups: Record<"failed" | "dbBak" | "assetsBak", Array<{ abs: string; mtimeMs: number }>> = {
     failed: [],
@@ -548,6 +567,8 @@ export async function cleanupRestoreArtifacts(input: { userDataPath: string; now
       continue;
     }
     if (stat.isSymbolicLink()) continue;
+    if ((group === "failed" || group === "assetsBak") && !stat.isDirectory()) continue;
+    if (group === "dbBak" && !stat.isFile()) continue;
 
     groups[group].push({ abs, mtimeMs: stat.mtimeMs });
   }
