@@ -56,7 +56,23 @@ function sanitizePath(p: string) {
   return rel || ".";
 }
 
-async function ensureDir(absDir: string) {
+async function isSymlink(absPath: string) {
+  try {
+    return (await fs.promises.lstat(absPath)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+async function ensureSafeDir(absDir: string) {
+  try {
+    const st = await fs.promises.lstat(absDir);
+    if (st.isSymbolicLink()) throw new Error("unsafe_dir");
+    if (!st.isDirectory()) throw new Error("unsafe_dir");
+    return;
+  } catch (e: any) {
+    if (e?.code !== "ENOENT") throw e;
+  }
   await fs.promises.mkdir(absDir, { recursive: true });
 }
 
@@ -85,9 +101,18 @@ async function rotateIfNeeded(absLogPath: string, incomingBytes: number) {
 async function appendLine(line: string) {
   ensureInitialized();
   const absLogPath = path.join(userDataPath!, getRestoreLogRelativePath());
-  await ensureDir(path.dirname(absLogPath));
+  const absLogsDir = path.dirname(absLogPath);
+  if (await isSymlink(absLogsDir)) throw new Error("unsafe_logs_dir");
+  await ensureSafeDir(absLogsDir);
+  if (await isSymlink(absLogPath)) throw new Error("unsafe_log_path");
   await rotateIfNeeded(absLogPath, Buffer.byteLength(line, "utf8"));
   await fs.promises.appendFile(absLogPath, line, "utf8");
+}
+
+function sanitizeMessage(message: string | undefined) {
+  if (!message) return message;
+  if (/[\\/]/.test(message)) return "<redacted>";
+  return message;
 }
 
 export function logRestoreEvent(input: {
@@ -106,7 +131,7 @@ export function logRestoreEvent(input: {
     event: input.event,
     phase: input.phase,
     error_code: input.error_code,
-    message: input.message,
+    message: sanitizeMessage(input.message),
     paths: input.paths?.map((p) => sanitizePath(p)),
     meta: input.meta,
   };
@@ -117,7 +142,7 @@ export function logRestoreEvent(input: {
 }
 
 async function writeJsonAtomic(absPath: string, value: any) {
-  await ensureDir(path.dirname(absPath));
+  await ensureSafeDir(path.dirname(absPath));
   const tmp = `${absPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   await fs.promises.writeFile(tmp, JSON.stringify(value, null, 2), "utf8");
   await fs.promises.rename(tmp, absPath);
@@ -136,6 +161,7 @@ export async function exportRestoreDiagnostic(input: { reason: string }) {
   const now = Date.now();
   const relativePath = path.join("diagnostics", `restore-diagnostic-${now}.json`).replace(/\\/g, "/");
   const abs = path.join(userDataPath, relativePath);
+  if (await isSymlink(path.dirname(abs))) return { ok: false as const, error: "unsafe_path" as const };
 
   const pendingPath = path.join(userDataPath, "restore-pending.json");
   const txPath = path.join(userDataPath, "restore-transaction.json");
@@ -173,4 +199,3 @@ export async function exportRestoreDiagnostic(input: { reason: string }) {
     return { ok: false as const, error: "write_failed" as const };
   }
 }
-
