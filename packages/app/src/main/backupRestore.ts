@@ -383,22 +383,32 @@ async function applyRestoreTransaction(input: { userDataPath: string; txPath: st
     }
 
     if (tx.phase === "backed_up") {
-      if (fs.existsSync(stagedDb) && !fs.existsSync(currentDb)) await fs.promises.rename(stagedDb, currentDb);
-      if (!fs.existsSync(stagedDb) && fs.existsSync(currentDb)) {
-        tx.phase = "db_swapped";
-      } else if (fs.existsSync(currentDb)) {
-        tx.phase = "db_swapped";
+      if (!fs.existsSync(currentDb) && !fs.existsSync(stagedDb) && fs.existsSync(dbBak)) {
+        throw new Error("staged db missing");
       }
+      if (fs.existsSync(stagedDb)) {
+        if (fs.existsSync(currentDb)) {
+          const nextBak = fs.existsSync(dbBak) ? uniquePath(dbBak) : dbBak;
+          await fs.promises.rename(currentDb, nextBak);
+        }
+        await fs.promises.rename(stagedDb, currentDb);
+      }
+      if (!fs.existsSync(stagedDb) && fs.existsSync(currentDb)) tx.phase = "db_swapped";
       await writeJsonAtomic(input.txPath, tx);
     }
 
     if (tx.phase === "db_swapped") {
-      if (fs.existsSync(stagedAssets) && !fs.existsSync(currentAssets)) await fs.promises.rename(stagedAssets, currentAssets);
-      if (!fs.existsSync(stagedAssets) && fs.existsSync(currentAssets)) {
-        tx.phase = "assets_swapped";
-      } else if (fs.existsSync(currentAssets)) {
-        tx.phase = "assets_swapped";
+      if (!fs.existsSync(currentAssets) && !fs.existsSync(stagedAssets) && fs.existsSync(assetsBak)) {
+        throw new Error("staged assets missing");
       }
+      if (fs.existsSync(stagedAssets)) {
+        if (fs.existsSync(currentAssets)) {
+          const nextBak = fs.existsSync(assetsBak) ? uniquePath(assetsBak) : assetsBak;
+          await fs.promises.rename(currentAssets, nextBak);
+        }
+        await fs.promises.rename(stagedAssets, currentAssets);
+      }
+      if (!fs.existsSync(stagedAssets) && fs.existsSync(currentAssets)) tx.phase = "assets_swapped";
       await writeJsonAtomic(input.txPath, tx);
     }
 
