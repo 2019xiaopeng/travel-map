@@ -41,3 +41,4 @@
 - [ADR-0037 Restore Transaction 路径信任边界与强校验](file:///workspace/docs/adr/ADR-0037-restore-transaction-path-trust-boundary.md)
 - [ADR-0038 Restore 产物 retention 清理策略（.bak / .failed）](file:///workspace/docs/adr/ADR-0038-restore-artifacts-retention-cleanup.md)
 - [ADR-0039 Retention 可配置性与异常文件类型安全策略](file:///workspace/docs/adr/ADR-0039-retention-config-and-filetype-safety.md)
+- [ADR-0040 Retention 默认值集中管理与 env 回退规则](file:///workspace/docs/adr/ADR-0040-retention-defaults-centralization.md)
