@@ -42,3 +42,4 @@
 - [ADR-0038 Restore 产物 retention 清理策略（.bak / .failed）](file:///workspace/docs/adr/ADR-0038-restore-artifacts-retention-cleanup.md)
 - [ADR-0039 Retention 可配置性与异常文件类型安全策略](file:///workspace/docs/adr/ADR-0039-retention-config-and-filetype-safety.md)
 - [ADR-0040 Retention 默认值集中管理与 env 回退规则](file:///workspace/docs/adr/ADR-0040-retention-defaults-centralization.md)
+- [ADR-0041 Restore 可观测性（结构化日志 + 诊断包导出）](file:///workspace/docs/adr/ADR-0041-restore-observability.md)
