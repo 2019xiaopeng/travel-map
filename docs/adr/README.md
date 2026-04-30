@@ -43,3 +43,4 @@
 - [ADR-0039 Retention 可配置性与异常文件类型安全策略](file:///workspace/docs/adr/ADR-0039-retention-config-and-filetype-safety.md)
 - [ADR-0040 Retention 默认值集中管理与 env 回退规则](file:///workspace/docs/adr/ADR-0040-retention-defaults-centralization.md)
 - [ADR-0041 Restore 可观测性（结构化日志 + 诊断包导出）](file:///workspace/docs/adr/ADR-0041-restore-observability.md)
+- [ADR-0042 Restore 诊断与日志的隐私脱敏与 symlink 安全](file:///workspace/docs/adr/ADR-0042-restore-diagnostics-privacy-and-symlink-safety.md)
