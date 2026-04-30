@@ -7,6 +7,23 @@ import path from "path";
 
 import { cleanupRestoreArtifacts } from "../src/main/backupRestore.ts";
 
+async function withEnv(vars: Record<string, string | undefined>, fn: () => Promise<void>) {
+  const prev: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(vars)) {
+    prev[k] = process.env[k];
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  try {
+    await fn();
+  } finally {
+    for (const [k, v] of Object.entries(prev)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
 test("cleanupRestoreArtifacts keeps only latest failed dirs", async () => {
   const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));
   const userDataPath = path.join(tmp, "userData");
@@ -91,35 +108,87 @@ test("cleanupRestoreArtifacts deletes old assets bak beyond topK and TTL", async
 });
 
 test("cleanupRestoreArtifacts supports env overrides for dbBak retention", async () => {
-  const prevTtl = process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS;
-  const prevTopK = process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK;
-  process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS = "1";
-  process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK = "0";
+  await withEnv({ TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS: "1", TRAVEL_MAP_RETENTION_DB_BAK_TOPK: "0" }, async () => {
+    const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));
+    const userDataPath = path.join(tmp, "userData");
+    await fs.promises.mkdir(userDataPath, { recursive: true });
+    const now = Date.now();
 
-  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));
-  const userDataPath = path.join(tmp, "userData");
-  await fs.promises.mkdir(userDataPath, { recursive: true });
-  const now = Date.now();
+    const mkFile = async (name: string, ageMs: number) => {
+      const p = path.join(userDataPath, name);
+      await fs.promises.writeFile(p, "x", "utf8");
+      const t = new Date(now - ageMs);
+      await fs.promises.utimes(p, t, t);
+    };
 
-  const mkFile = async (name: string, ageMs: number) => {
-    const p = path.join(userDataPath, name);
-    await fs.promises.writeFile(p, "x", "utf8");
-    const t = new Date(now - ageMs);
-    await fs.promises.utimes(p, t, t);
-  };
+    await mkFile("travel-map.sqlite.bak-1", 10);
+    await mkFile("travel-map.sqlite.bak-2", 10);
 
-  await mkFile("travel-map.sqlite.bak-1", 10);
-  await mkFile("travel-map.sqlite.bak-2", 10);
-
-  try {
     await cleanupRestoreArtifacts({ userDataPath, now });
     const names = await fs.promises.readdir(userDataPath);
     assert.equal(names.some((n) => n.startsWith("travel-map.sqlite.bak-")), false);
-  } finally {
-    if (prevTtl === undefined) delete process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS;
-    else process.env.TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS = prevTtl;
-    if (prevTopK === undefined) delete process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK;
-    else process.env.TRAVEL_MAP_RETENTION_DB_BAK_TOPK = prevTopK;
+  });
+});
+
+test("cleanupRestoreArtifacts falls back to defaults when env topK is invalid", async () => {
+  await withEnv({ TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS: "1", TRAVEL_MAP_RETENTION_DB_BAK_TOPK: "1.5" }, async () => {
+    const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));
+    const userDataPath = path.join(tmp, "userData");
+    await fs.promises.mkdir(userDataPath, { recursive: true });
+    const now = Date.now();
+
+    for (let i = 1; i <= 8; i++) {
+      const p = path.join(userDataPath, `travel-map.sqlite.bak-${i}`);
+      await fs.promises.writeFile(p, "x", "utf8");
+      const t = new Date(now - 10 * 24 * 3600_000);
+      await fs.promises.utimes(p, t, t);
+    }
+
+    await cleanupRestoreArtifacts({ userDataPath, now });
+    const names = await fs.promises.readdir(userDataPath);
+    assert.equal(names.filter((n) => n.startsWith("travel-map.sqlite.bak-")).length, 5);
+  });
+});
+
+test("cleanupRestoreArtifacts falls back to defaults when env topK is empty", async () => {
+  await withEnv({ TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS: "1", TRAVEL_MAP_RETENTION_DB_BAK_TOPK: "" }, async () => {
+    const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));
+    const userDataPath = path.join(tmp, "userData");
+    await fs.promises.mkdir(userDataPath, { recursive: true });
+    const now = Date.now();
+
+    for (let i = 1; i <= 8; i++) {
+      const p = path.join(userDataPath, `travel-map.sqlite.bak-${i}`);
+      await fs.promises.writeFile(p, "x", "utf8");
+      const t = new Date(now - 10 * 24 * 3600_000);
+      await fs.promises.utimes(p, t, t);
+    }
+
+    await cleanupRestoreArtifacts({ userDataPath, now });
+    const names = await fs.promises.readdir(userDataPath);
+    assert.equal(names.filter((n) => n.startsWith("travel-map.sqlite.bak-")).length, 5);
+  });
+});
+
+test("cleanupRestoreArtifacts falls back to defaults when env ttl is invalid", async () => {
+  for (const ttl of ["-1", "NaN", ""] as const) {
+    await withEnv({ TRAVEL_MAP_RETENTION_DB_BAK_TTL_MS: ttl, TRAVEL_MAP_RETENTION_DB_BAK_TOPK: "0" }, async () => {
+      const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "travel-map-cleanup-"));
+      const userDataPath = path.join(tmp, "userData");
+      await fs.promises.mkdir(userDataPath, { recursive: true });
+      const now = Date.now();
+
+      for (let i = 1; i <= 2; i++) {
+        const p = path.join(userDataPath, `travel-map.sqlite.bak-${i}`);
+        await fs.promises.writeFile(p, "x", "utf8");
+        const t = new Date(now - 10 * 24 * 3600_000);
+        await fs.promises.utimes(p, t, t);
+      }
+
+      await cleanupRestoreArtifacts({ userDataPath, now });
+      const names = await fs.promises.readdir(userDataPath);
+      assert.equal(names.filter((n) => n.startsWith("travel-map.sqlite.bak-")).length, 2);
+    });
   }
 });
 
