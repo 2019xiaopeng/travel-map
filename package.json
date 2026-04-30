@@ -7,7 +7,7 @@
     "dev": "pnpm --filter @travel-map/renderer dev",
     "dev:electron": "pnpm --filter @travel-map/app dev",
     "build": "pnpm --filter @travel-map/renderer build && pnpm --filter @travel-map/app build",
-    "lint": "pnpm -r lint",
+    "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
