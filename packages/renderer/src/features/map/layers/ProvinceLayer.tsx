@@ -4,25 +4,26 @@ import { loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths, featureCe
 import { useMapStore } from "../mapStore";
 
 const NORMAL_STYLE = {
-  strokeColor: "#3b82f6",
-  strokeWeight: 1.5,
-  strokeOpacity: 0.6,
-  fillColor: "#3b82f6",
-  fillOpacity: 0.08,
+  strokeColor: "#f59e0b",
+  strokeWeight: 3,
+  strokeOpacity: 0.95,
+  fillColor: "#f59e0b",
+  fillOpacity: 0.2,
   cursor: "pointer" as const,
 };
 
 const HOVER_STYLE = {
-  strokeColor: "#60a5fa",
-  strokeWeight: 2,
-  strokeOpacity: 0.9,
-  fillColor: "#3b82f6",
-  fillOpacity: 0.18,
+  strokeColor: "#fbbf24",
+  strokeWeight: 4,
+  strokeOpacity: 1,
+  fillColor: "#f59e0b",
+  fillOpacity: 0.32,
   cursor: "pointer" as const,
 };
 
 export function ProvinceLayer({ map }: { map: any }) {
   const polygonsRef = useRef<any[]>([]);
+  const labelsRef = useRef<any[]>([]);
   const tooltipRef = useRef<any>(null);
   const enterProvince = useMapStore((s) => s.enterProvince);
 
@@ -50,13 +51,14 @@ export function ProvinceLayer({ map }: { map: any }) {
         anchor: "bottom-center",
         offset: new AMap.Pixel(0, -10),
         style: {
-          "background-color": "rgba(0, 0, 0, 0.75)",
+          "background-color": "rgba(15, 23, 42, 0.92)",
           "color": "#fff",
-          "border": "none",
-          "border-radius": "4px",
-          "padding": "4px 8px",
+          "border": "1px solid rgba(251, 191, 36, 0.45)",
+          "border-radius": "9999px",
+          "padding": "6px 10px",
           "font-size": "12px",
-          "box-shadow": "0 2px 6px rgba(0,0,0,0.3)",
+          "font-weight": "600",
+          "box-shadow": "0 8px 18px rgba(0,0,0,0.35)",
           "pointer-events": "none",
         },
         visible: false,
@@ -104,8 +106,37 @@ export function ProvinceLayer({ map }: { map: any }) {
         return polygon;
       });
 
+      const labels = geo.features.map((feature) => {
+        const label = new AMap.Text({
+          text: feature.properties.name,
+          position: feature.properties.center,
+          anchor: "center",
+          style: {
+            "background-color": "rgba(245, 158, 11, 0.16)",
+            "border": "1px solid rgba(251, 191, 36, 0.28)",
+            "border-radius": "9999px",
+            "padding": "4px 8px",
+            "color": "#fde68a",
+            "font-size": "11px",
+            "font-weight": "600",
+            "box-shadow": "0 6px 14px rgba(0, 0, 0, 0.28)",
+            "cursor": "pointer",
+          },
+          zIndex: 110,
+        });
+
+        label.on("click", () => handleClick(feature, polygons.find((polygon) => {
+          const extData = polygon.getExtData() as { id?: string };
+          return extData?.id === feature.properties.id;
+        }) ?? polygons[0]));
+
+        return label;
+      });
+
       polygonsRef.current = polygons;
+      labelsRef.current = labels;
       map.add(polygons);
+      map.add(labels);
       map.setFitView(polygons, false, [60, 60, 60, 60]);
     });
 
@@ -119,6 +150,11 @@ export function ProvinceLayer({ map }: { map: any }) {
         p.setMap(null);
       });
       polygonsRef.current = [];
+      labelsRef.current.forEach((label) => {
+        label.off("click");
+        label.setMap(null);
+      });
+      labelsRef.current = [];
       if (tooltipRef.current) {
         tooltipRef.current.setMap(null);
         tooltipRef.current = null;

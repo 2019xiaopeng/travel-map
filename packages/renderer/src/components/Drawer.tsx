@@ -92,6 +92,19 @@ export function Drawer({ open, onClose }: DrawerProps) {
 
       {/* 内容区 */}
       <div className="flex-1 overflow-y-auto">
+        {level === "province" && provinceName && (
+          <div className="p-5">
+            <div className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4 text-sm text-sky-100">
+              <div className="text-base font-semibold">{provinceName}</div>
+              <div className="mt-2 text-sm leading-6 text-sky-100/80">
+                已进入省级视图。请直接单击地图中的城市边界，右侧会切换为该城市的旅行详情。
+              </div>
+              <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-2 text-xs text-sky-50/80">
+                提示：右侧按钮会明确显示“展开详情 / 收起详情”，不用再猜抽屉有没有打开。
+              </div>
+            </div>
+          </div>
+        )}
         {level === "city" && cityName && cityId && provinceId && provinceName && (
           <>
             {view === "city-home" && (

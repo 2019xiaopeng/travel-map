@@ -161,33 +161,34 @@ async function loadLocalCities(provinceId: string, map: any): Promise<GeoFeature
 }
 
 const NORMAL_STYLE = {
-  strokeColor: "#60a5fa",
-  strokeWeight: 1,
-  strokeOpacity: 0.5,
-  fillColor: "#3b82f6",
-  fillOpacity: 0.06,
+  strokeColor: "#38bdf8",
+  strokeWeight: 2.2,
+  strokeOpacity: 0.92,
+  fillColor: "#0ea5e9",
+  fillOpacity: 0.2,
   cursor: "pointer" as const,
 };
 
 const HOVER_STYLE = {
-  strokeColor: "#93c5fd",
-  strokeWeight: 1.5,
-  strokeOpacity: 0.8,
-  fillColor: "#3b82f6",
-  fillOpacity: 0.15,
+  strokeColor: "#7dd3fc",
+  strokeWeight: 3,
+  strokeOpacity: 1,
+  fillColor: "#38bdf8",
+  fillOpacity: 0.32,
   cursor: "pointer" as const,
 };
 
 const SELECTED_STYLE = {
-  strokeColor: "#fbbf24",
-  strokeWeight: 2.5,
+  strokeColor: "#22d3ee",
+  strokeWeight: 3.5,
   strokeOpacity: 1,
-  fillColor: "#fbbf24",
-  fillOpacity: 0.12,
+  fillColor: "#06b6d4",
+  fillOpacity: 0.42,
 };
 
 export function CityLayer({ map, provinceId }: { map: any; provinceId: string | null }) {
   const polygonsRef = useRef<any[]>([]);
+  const labelsRef = useRef<any[]>([]);
   const selectedRef = useRef<any>(null);
   const enterCity = useMapStore((s) => s.enterCity);
   const cityId = useMapStore((s) => s.cityId);
@@ -253,8 +254,37 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
         return polygon;
       });
 
+      const labels = features.map((feature) => {
+        const label = new AMap.Text({
+          text: feature.properties.name,
+          position: feature.properties.center,
+          anchor: "center",
+          style: {
+            "background-color": "rgba(14, 165, 233, 0.14)",
+            "border": "1px solid rgba(125, 211, 252, 0.28)",
+            "border-radius": "9999px",
+            "padding": "3px 7px",
+            "color": "#bae6fd",
+            "font-size": "10px",
+            "font-weight": "600",
+            "box-shadow": "0 4px 10px rgba(0, 0, 0, 0.24)",
+            "cursor": "pointer",
+          },
+          zIndex: 110,
+        });
+
+        label.on("click", () => {
+          const { id, name } = feature.properties;
+          enterCity(id, name);
+        });
+
+        return label;
+      });
+
       polygonsRef.current = polygons;
+      labelsRef.current = labels;
       map.add(polygons);
+      map.add(labels);
     });
 
     return () => {
@@ -266,6 +296,11 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
         p.setMap(null);
       });
       polygonsRef.current = [];
+      labelsRef.current.forEach((label) => {
+        label.off("click");
+        label.setMap(null);
+      });
+      labelsRef.current = [];
       selectedRef.current = null;
     };
   }, [map, provinceId, enterCity]);
