@@ -18,19 +18,19 @@ export function loadGeoJson(path: string): Promise<GeoCollection> {
 /** Convert a GeoJSON Polygon coordinates to AMap path arrays */
 export function polygonCoordsToPaths(
   coords: number[][][],
-): { lng: number; lat: number }[][] {
+) {
   return coords.map((ring) =>
-    ring.map(([lng, lat]) => ({ lng, lat })),
+    ring.map(([lng, lat]) => [lng, lat] as [number, number]),
   );
 }
 
 /** Convert a GeoJSON MultiPolygon coordinates to AMap path arrays */
 export function multiPolygonCoordsToPaths(
   coords: number[][][][],
-): { lng: number; lat: number }[][][] {
+) {
   return coords.map((polygon) =>
     polygon.map((ring) =>
-      ring.map(([lng, lat]) => ({ lng, lat })),
+      ring.map(([lng, lat]) => [lng, lat] as [number, number]),
     ),
   );
 }
@@ -49,4 +49,33 @@ export function featureCenter(geometry: {
   const lng = sample.reduce((s, c) => s + c[0], 0) / sample.length;
   const lat = sample.reduce((s, c) => s + c[1], 0) / sample.length;
   return [lng, lat];
+}
+
+function flattenGeometry(geometry: {
+  type: "Polygon" | "MultiPolygon";
+  coordinates: number[][][] | number[][][][];
+}): [number, number][][] {
+  if (geometry.type === "Polygon") {
+    return geometry.coordinates as [number, number][][];
+  }
+
+  return (geometry.coordinates as [number, number][][][]).flat();
+}
+
+export function focusFeatureOnMap(
+  map: any,
+  geometry: {
+    type: "Polygon" | "MultiPolygon";
+    coordinates: number[][][] | number[][][][];
+  },
+  padding: [number, number, number, number] = [80, 420, 80, 80],
+) {
+  const AMap = window.AMap;
+  const focusPolygon = new AMap.Polygon({
+    path: flattenGeometry(geometry),
+    strokeOpacity: 0,
+    fillOpacity: 0,
+  });
+  map.setFitView([focusPolygon], false, padding);
+  focusPolygon.setMap(null);
 }

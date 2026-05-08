@@ -1,40 +1,42 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { GeoFeature } from "../geoTypes";
-import { loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths, featureCenter } from "../geoUtils";
+import { focusFeatureOnMap, loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
 import { useMapStore } from "../mapStore";
 
 const NORMAL_STYLE = {
   strokeColor: "#f59e0b",
-  strokeWeight: 3,
-  strokeOpacity: 0.95,
+  strokeWeight: 3.4,
+  strokeOpacity: 1,
   fillColor: "#f59e0b",
-  fillOpacity: 0.2,
+  fillOpacity: 0.01,
   cursor: "pointer" as const,
+  zIndex: 60,
 };
 
 const HOVER_STYLE = {
   strokeColor: "#fbbf24",
-  strokeWeight: 4,
+  strokeWeight: 4.6,
   strokeOpacity: 1,
   fillColor: "#f59e0b",
-  fillOpacity: 0.32,
+  fillOpacity: 0.08,
   cursor: "pointer" as const,
+  zIndex: 70,
 };
 
 export function ProvinceLayer({ map }: { map: any }) {
   const polygonsRef = useRef<any[]>([]);
-  const labelsRef = useRef<any[]>([]);
+  const outlinesRef = useRef<any[]>([]);
   const tooltipRef = useRef<any>(null);
   const enterProvince = useMapStore((s) => s.enterProvince);
 
   const handleClick = useCallback(
-    (feature: GeoFeature, polygon: any) => {
+    (feature: GeoFeature) => {
       if (tooltipRef.current) {
         tooltipRef.current.hide();
       }
-      const { id, name, center } = feature.properties;
+      const { id, name } = feature.properties;
       enterProvince(id, name);
-      map.setFitView([polygon], false, [60, 60, 60, 60]);
+      focusFeatureOnMap(map, feature.geometry);
     },
     [map, enterProvince],
   );
@@ -70,7 +72,10 @@ export function ProvinceLayer({ map }: { map: any }) {
     loadGeoJson("china-provinces.json").then((geo) => {
       if (cancelled) return;
 
-      const polygons = geo.features.map((feature) => {
+      const polygons: any[] = [];
+      const outlines: any[] = [];
+
+      geo.features.forEach((feature) => {
         const paths =
           feature.geometry.type === "Polygon"
             ? polygonCoordsToPaths(feature.geometry.coordinates as number[][][])
@@ -82,7 +87,7 @@ export function ProvinceLayer({ map }: { map: any }) {
           extData: feature.properties,
         });
 
-        polygon.on("click", () => handleClick(feature, polygon));
+        polygon.on("click", () => handleClick(feature));
         polygon.on("mouseover", (e: any) => {
           polygon.setOptions(HOVER_STYLE);
           if (tooltipRef.current) {
@@ -103,40 +108,31 @@ export function ProvinceLayer({ map }: { map: any }) {
           }
         });
 
-        return polygon;
-      });
+        polygons.push(polygon);
 
-      const labels = geo.features.map((feature) => {
-        const label = new AMap.Text({
-          text: feature.properties.name,
-          position: feature.properties.center,
-          anchor: "center",
-          style: {
-            "background-color": "rgba(245, 158, 11, 0.16)",
-            "border": "1px solid rgba(251, 191, 36, 0.28)",
-            "border-radius": "9999px",
-            "padding": "4px 8px",
-            "color": "#fde68a",
-            "font-size": "11px",
-            "font-weight": "600",
-            "box-shadow": "0 6px 14px rgba(0, 0, 0, 0.28)",
-            "cursor": "pointer",
-          },
-          zIndex: 110,
+        const outlineSets = Array.isArray(paths[0][0][0]) ? (paths as [number, number][][][]) : [paths as [number, number][][]];
+        outlineSets.forEach((polygonRings) => {
+          polygonRings.forEach((ring) => {
+            const outline = new AMap.Polyline({
+              path: ring,
+              strokeColor: "#fbbf24",
+              strokeOpacity: 1,
+              strokeWeight: 3,
+              strokeStyle: "solid",
+              lineJoin: "round",
+              lineCap: "round",
+              zIndex: 95,
+            });
+            outlines.push(outline);
+          });
         });
 
-        label.on("click", () => handleClick(feature, polygons.find((polygon) => {
-          const extData = polygon.getExtData() as { id?: string };
-          return extData?.id === feature.properties.id;
-        }) ?? polygons[0]));
-
-        return label;
       });
 
       polygonsRef.current = polygons;
-      labelsRef.current = labels;
+      outlinesRef.current = outlines;
       map.add(polygons);
-      map.add(labels);
+      map.add(outlines);
       map.setFitView(polygons, false, [60, 60, 60, 60]);
     });
 
@@ -150,11 +146,10 @@ export function ProvinceLayer({ map }: { map: any }) {
         p.setMap(null);
       });
       polygonsRef.current = [];
-      labelsRef.current.forEach((label) => {
-        label.off("click");
-        label.setMap(null);
+      outlinesRef.current.forEach((outline) => {
+        outline.setMap(null);
       });
-      labelsRef.current = [];
+      outlinesRef.current = [];
       if (tooltipRef.current) {
         tooltipRef.current.setMap(null);
         tooltipRef.current = null;

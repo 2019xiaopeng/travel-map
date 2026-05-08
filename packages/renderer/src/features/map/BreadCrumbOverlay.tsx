@@ -7,6 +7,7 @@ export function BreadCrumbOverlay() {
   const drawerOpen = useMapStore((s) => s.drawerOpen);
   const backToCountry = useMapStore((s) => s.backToCountry);
   const backToProvince = useMapStore((s) => s.backToProvince);
+  const setDrawerOpen = useMapStore((s) => s.setDrawerOpen);
   const addingPoi = useMapStore((s) => s.addingPoi);
   const poiDraft = useMapStore((s) => s.poiDraft);
   const startAddPoi = useMapStore((s) => s.startAddPoi);
@@ -72,6 +73,19 @@ export function BreadCrumbOverlay() {
             }`}
           >
             {addingPoi ? "取消添加" : "添加地标"}
+          </button>
+        )}
+
+        {level !== "country" && (
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDrawerOpen(!drawerOpen);
+            }}
+            className="ml-2 rounded border border-white/10 bg-black/35 px-2 py-1 text-[10px] text-neutral-200 transition-colors hover:bg-black/55 hover:text-white"
+          >
+            {drawerOpen ? "收起详情" : "展开详情"}
           </button>
         )}
       </div>

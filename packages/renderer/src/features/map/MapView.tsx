@@ -6,6 +6,7 @@ import { CityLayer } from "./layers/CityLayer";
 import { PoiLayer } from "./layers/PoiLayer";
 import { BreadCrumbOverlay } from "./BreadCrumbOverlay";
 import { PoiAddModal } from "./PoiAddModal";
+import { ProvinceTagOverlay } from "./ProvinceTagOverlay";
 
 export function MapView() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,7 +33,7 @@ export function MapView() {
           zoom: 4.5,
           center: [104.5, 35.5] as [number, number],
           mapStyle: "amap://styles/dark",
-          features: ["bg"],
+          features: ["bg", "road"],
           showLabel: false,
           animateEnable: true,
           dragEnable: true,
@@ -83,6 +84,8 @@ export function MapView() {
       )}
 
       {level === "country" && map && <ProvinceLayer map={map} />}
+
+      {level === "country" && map && <ProvinceTagOverlay map={map} />}
 
       {(level === "province" || level === "city") && map && provinceId && (
         <CityLayer map={map} provinceId={provinceId} />

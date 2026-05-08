@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { GeoFeature } from "../geoTypes";
-import { loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths, featureCenter } from "../geoUtils";
+import { focusFeatureOnMap, loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths, featureCenter } from "../geoUtils";
 import { useMapStore } from "../mapStore";
 
 interface RawMasterFeature {
@@ -162,33 +162,37 @@ async function loadLocalCities(provinceId: string, map: any): Promise<GeoFeature
 
 const NORMAL_STYLE = {
   strokeColor: "#38bdf8",
-  strokeWeight: 2.2,
-  strokeOpacity: 0.92,
+  strokeWeight: 2.8,
+  strokeOpacity: 1,
   fillColor: "#0ea5e9",
-  fillOpacity: 0.2,
+  fillOpacity: 0.01,
   cursor: "pointer" as const,
+  zIndex: 70,
 };
 
 const HOVER_STYLE = {
   strokeColor: "#7dd3fc",
-  strokeWeight: 3,
+  strokeWeight: 3.6,
   strokeOpacity: 1,
   fillColor: "#38bdf8",
-  fillOpacity: 0.32,
+  fillOpacity: 0.08,
   cursor: "pointer" as const,
+  zIndex: 80,
 };
 
 const SELECTED_STYLE = {
   strokeColor: "#22d3ee",
-  strokeWeight: 3.5,
+  strokeWeight: 4,
   strokeOpacity: 1,
   fillColor: "#06b6d4",
-  fillOpacity: 0.42,
+  fillOpacity: 0.12,
+  zIndex: 90,
 };
 
 export function CityLayer({ map, provinceId }: { map: any; provinceId: string | null }) {
   const polygonsRef = useRef<any[]>([]);
   const labelsRef = useRef<any[]>([]);
+  const outlinesRef = useRef<any[]>([]);
   const selectedRef = useRef<any>(null);
   const enterCity = useMapStore((s) => s.enterCity);
   const cityId = useMapStore((s) => s.cityId);
@@ -237,6 +241,7 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
         polygon.on("click", () => {
           const { id, name } = feature.properties;
           enterCity(id, name);
+          focusFeatureOnMap(map, feature.geometry);
         });
 
         polygon.on("mouseover", () => {
@@ -252,6 +257,29 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
         });
 
         return polygon;
+      });
+
+      const outlines = features.flatMap((feature) => {
+        const paths =
+          feature.geometry.type === "Polygon"
+            ? polygonCoordsToPaths(feature.geometry.coordinates as number[][][])
+            : multiPolygonCoordsToPaths(feature.geometry.coordinates as number[][][][]);
+        const outlineSets = Array.isArray(paths[0][0][0]) ? (paths as [number, number][][][]) : [paths as [number, number][][]];
+
+        return outlineSets.flatMap((polygonRings) =>
+          polygonRings.map((ring) =>
+            new AMap.Polyline({
+              path: ring,
+              strokeColor: "#38bdf8",
+              strokeOpacity: 0.95,
+              strokeWeight: 2.4,
+              strokeStyle: "solid",
+              lineJoin: "round",
+              lineCap: "round",
+              zIndex: 100,
+            }),
+          ),
+        );
       });
 
       const labels = features.map((feature) => {
@@ -276,6 +304,7 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
         label.on("click", () => {
           const { id, name } = feature.properties;
           enterCity(id, name);
+          focusFeatureOnMap(map, feature.geometry);
         });
 
         return label;
@@ -283,7 +312,9 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
 
       polygonsRef.current = polygons;
       labelsRef.current = labels;
+      outlinesRef.current = outlines;
       map.add(polygons);
+      map.add(outlines);
       map.add(labels);
     });
 
@@ -296,6 +327,10 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
         p.setMap(null);
       });
       polygonsRef.current = [];
+      outlinesRef.current.forEach((outline) => {
+        outline.setMap(null);
+      });
+      outlinesRef.current = [];
       labelsRef.current.forEach((label) => {
         label.off("click");
         label.setMap(null);

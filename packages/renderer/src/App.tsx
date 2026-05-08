@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Drawer } from "./components/Drawer";
 import { MapView } from "./features/map/MapView";
 import { useMapStore } from "./features/map/mapStore";
@@ -8,7 +9,19 @@ export default function App() {
   const drawerOpen = useMapStore((s) => s.drawerOpen);
   const setDrawerOpen = useMapStore((s) => s.setDrawerOpen);
   const level = useMapStore((s) => s.level);
-  const drawerToggleLabel = drawerOpen ? "收起详情" : "展开详情";
+  const toggleDrawer = () => setDrawerOpen(!drawerOpen);
+  const closeDrawer = () => setDrawerOpen(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDrawerOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [setDrawerOpen]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[var(--color-bg)]">
@@ -16,30 +29,43 @@ export default function App() {
       <MapView />
 
       {/* 顶栏浮层 */}
-      <header className="absolute top-0 right-0 left-0 z-20 flex items-center justify-between px-4 py-2 pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <span className="text-sm font-medium text-neutral-300">旅行地图</span>
-        </div>
-      </header>
-
       {level !== "country" && (
-        <div className="pointer-events-none absolute top-1/2 right-4 z-40 -translate-y-1/2">
+        <header className="absolute top-4 right-4 z-50 flex items-center gap-2">
           <button
-            onClick={() => setDrawerOpen(!drawerOpen)}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleDrawer();
+            }}
             className="
-              pointer-events-auto flex items-center gap-2 rounded-full border border-[var(--color-border)]
-              bg-[var(--color-surface)]/88 px-4 py-2 text-xs font-medium text-white shadow-lg backdrop-blur-md
-              transition-colors hover:bg-[var(--color-surface-elevated)]
+              rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs text-neutral-200
+              backdrop-blur-md transition-colors hover:bg-black/60 hover:text-white
             "
           >
-            <span>{drawerToggleLabel}</span>
-            <span className="text-neutral-400">{drawerOpen ? ">" : "<"}</span>
+            {drawerOpen ? "收起详情" : "展开详情"}
           </button>
-        </div>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              closeDrawer();
+            }}
+            className="
+              rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs text-neutral-200
+              backdrop-blur-md transition-colors hover:bg-black/60 hover:text-white
+            "
+          >
+            关闭抽屉
+          </button>
+        </header>
       )}
 
       {/* 右侧抽屉 */}
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onToggle={() => setDrawerOpen(!drawerOpen)}
+      />
 
       <DialogHost />
       <ToastViewport />
