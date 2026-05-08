@@ -10,6 +10,7 @@ declare global {
 }
 
 let loadPromise: Promise<any> | null = null;
+const pluginPromises = new Map<string, Promise<any>>();
 
 export function loadAmapSdk(): Promise<any> {
   if (loadPromise) return loadPromise;
@@ -51,4 +52,19 @@ export function loadAmapSdk(): Promise<any> {
   });
 
   return loadPromise;
+}
+
+export async function loadAmapPlugin(pluginName: string): Promise<any> {
+  const AMap = await loadAmapSdk();
+
+  if (pluginPromises.has(pluginName)) {
+    return pluginPromises.get(pluginName)!;
+  }
+
+  const promise = new Promise<any>((resolve) => {
+    AMap.plugin(pluginName, () => resolve(AMap));
+  });
+
+  pluginPromises.set(pluginName, promise);
+  return promise;
 }

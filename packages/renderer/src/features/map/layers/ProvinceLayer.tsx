@@ -1,8 +1,9 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { GeoFeature } from "../geoTypes";
-import { focusFeatureOnMap, loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
+import { focusFeatureOnMap, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
 import { useMapStore } from "../mapStore";
 import { MAP_FIT_PADDING_CLOSED, PROVINCE_LAYER_TOKENS } from "../mapLayout.js";
+import { loadProvinceBoundaries } from "../provinceBoundaries";
 
 const NORMAL_STYLE = {
   strokeColor: PROVINCE_LAYER_TOKENS.stroke,
@@ -70,13 +71,13 @@ export function ProvinceLayer({ map }: { map: any }) {
       tooltipRef.current.setMap(map);
     }
 
-    loadGeoJson("china-provinces.json").then((geo) => {
+    loadProvinceBoundaries().then((features) => {
       if (cancelled) return;
 
       const polygons: any[] = [];
       const outlines: any[] = [];
 
-      geo.features.forEach((feature) => {
+      features.forEach((feature) => {
         const paths =
           feature.geometry.type === "Polygon"
             ? polygonCoordsToPaths(feature.geometry.coordinates as number[][][])

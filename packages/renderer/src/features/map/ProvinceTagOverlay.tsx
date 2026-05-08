@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { GeoFeature } from "./geoTypes";
-import { focusFeatureOnMap, loadGeoJson } from "./geoUtils";
+import { focusFeatureOnMap } from "./geoUtils";
 import { useMapStore } from "./mapStore";
 import { PROVINCE_LAYER_TOKENS } from "./mapLayout.js";
+import { loadProvinceBoundaries } from "./provinceBoundaries";
 
 interface ProvinceTagOverlayProps {
   map: any;
@@ -62,8 +63,8 @@ export function ProvinceTagOverlay({ map }: ProvinceTagOverlayProps) {
 
   useEffect(() => {
     let cancelled = false;
-    loadGeoJson("china-provinces.json").then((geo) => {
-      if (!cancelled) setFeatures(geo.features);
+    loadProvinceBoundaries().then((provinceFeatures) => {
+      if (!cancelled) setFeatures(provinceFeatures);
     });
     return () => {
       cancelled = true;
