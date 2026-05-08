@@ -60,7 +60,13 @@ export function ProvinceLayer({ map }: { map: any }) {
   }, []);
 
   const renderFeatures = useCallback(
-    (features: GeoFeature[], fitView: boolean) => {
+    (
+      features: GeoFeature[],
+      options: {
+        fitView: boolean;
+        showBoundary: boolean;
+      },
+    ) => {
       const AMap = window.AMap;
       clearLayers();
 
@@ -75,13 +81,19 @@ export function ProvinceLayer({ map }: { map: any }) {
 
         const polygon = new AMap.Polygon({
           ...NORMAL_STYLE,
+          strokeOpacity: options.showBoundary ? NORMAL_STYLE.strokeOpacity : 0,
+          fillOpacity: options.showBoundary ? NORMAL_STYLE.fillOpacity : 0.001,
           path: paths,
           extData: feature.properties,
         });
 
         polygon.on("click", () => handleClick(feature));
         polygon.on("mouseover", (e: any) => {
-          polygon.setOptions(HOVER_STYLE);
+          polygon.setOptions({
+            ...HOVER_STYLE,
+            strokeOpacity: options.showBoundary ? HOVER_STYLE.strokeOpacity : 0,
+            fillOpacity: options.showBoundary ? HOVER_STYLE.fillOpacity : 0.05,
+          });
           if (tooltipRef.current) {
             tooltipRef.current.setText(feature.properties.name);
             tooltipRef.current.setPosition(e.lnglat);
@@ -102,29 +114,33 @@ export function ProvinceLayer({ map }: { map: any }) {
 
         polygons.push(polygon);
 
-        const outlineSets = Array.isArray(paths[0][0][0]) ? (paths as [number, number][][][]) : [paths as [number, number][][]];
-        outlineSets.forEach((polygonRings) => {
-          polygonRings.forEach((ring) => {
-            const outline = new AMap.Polyline({
-              path: ring,
-              strokeColor: PROVINCE_LAYER_TOKENS.stroke,
-              strokeOpacity: 0.86,
-              strokeWeight: 1.8,
-              strokeStyle: "solid",
-              lineJoin: "round",
-              lineCap: "round",
-              zIndex: 95,
+        if (options.showBoundary) {
+          const outlineSets = Array.isArray(paths[0][0][0]) ? (paths as [number, number][][][]) : [paths as [number, number][][]];
+          outlineSets.forEach((polygonRings) => {
+            polygonRings.forEach((ring) => {
+              const outline = new AMap.Polyline({
+                path: ring,
+                strokeColor: PROVINCE_LAYER_TOKENS.stroke,
+                strokeOpacity: 0.86,
+                strokeWeight: 1.8,
+                strokeStyle: "solid",
+                lineJoin: "round",
+                lineCap: "round",
+                zIndex: 95,
+              });
+              outlines.push(outline);
             });
-            outlines.push(outline);
           });
-        });
+        }
       });
 
       polygonsRef.current = polygons;
       outlinesRef.current = outlines;
       map.add(polygons);
-      map.add(outlines);
-      if (fitView) {
+      if (outlines.length > 0) {
+        map.add(outlines);
+      }
+      if (options.fitView) {
         map.setFitView(polygons, false, MAP_FIT_PADDING_CLOSED);
       }
     },
@@ -161,13 +177,13 @@ export function ProvinceLayer({ map }: { map: any }) {
 
     loadLocalProvinceBoundaries().then((features) => {
       if (!cancelled) {
-        renderFeatures(features, true);
+        renderFeatures(features, { fitView: true, showBoundary: false });
       }
     });
 
     loadProvinceBoundaries().then((features) => {
       if (!cancelled) {
-        renderFeatures(features, false);
+        renderFeatures(features, { fitView: false, showBoundary: true });
       }
     });
 
