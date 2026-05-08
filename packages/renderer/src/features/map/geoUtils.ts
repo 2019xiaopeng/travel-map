@@ -1,4 +1,5 @@
 import type { GeoCollection } from "./geoTypes";
+import { MAP_FIT_PADDING_CLOSED, MAP_FIT_PADDING_OPEN } from "./mapLayout.js";
 
 const geoCache = new Map<string, Promise<GeoCollection>>();
 
@@ -35,20 +36,48 @@ export function multiPolygonCoordsToPaths(
   );
 }
 
-/** Calculate the centroid of a feature from its geometry */
+function geometryPoints(geometry: {
+  type: string;
+  coordinates: number[][][] | number[][][][];
+}) {
+  const rings =
+    geometry.type === "Polygon"
+      ? (geometry.coordinates as number[][][])
+      : (geometry.coordinates as number[][][][]).flat();
+
+  return rings.flat();
+}
+
+export function geometryBounds(geometry: {
+  type: string;
+  coordinates: number[][][] | number[][][][];
+}) {
+  const points = geometryPoints(geometry);
+  const lngs = points.map(([lng]) => lng);
+  const lats = points.map(([, lat]) => lat);
+
+  return {
+    minLng: Math.min(...lngs),
+    maxLng: Math.max(...lngs),
+    minLat: Math.min(...lats),
+    maxLat: Math.max(...lats),
+  };
+}
+
+/** Calculate a stable center from a feature geometry */
 export function featureCenter(geometry: {
   type: string;
   coordinates: number[][][] | number[][][][];
 }): [number, number] {
-  const coords =
-    geometry.type === "Polygon"
-      ? (geometry.coordinates as number[][][])[0]
-      : (geometry.coordinates as number[][][][])[0][0];
+  const bounds = geometryBounds(geometry);
+  return [
+    (bounds.minLng + bounds.maxLng) / 2,
+    (bounds.minLat + bounds.maxLat) / 2,
+  ];
+}
 
-  const sample = coords.slice(0, 20);
-  const lng = sample.reduce((s, c) => s + c[0], 0) / sample.length;
-  const lat = sample.reduce((s, c) => s + c[1], 0) / sample.length;
-  return [lng, lat];
+export function getDrawerFitPadding(input: { drawerOpen: boolean }) {
+  return input.drawerOpen ? MAP_FIT_PADDING_OPEN : MAP_FIT_PADDING_CLOSED;
 }
 
 function flattenGeometry(geometry: {
@@ -68,7 +97,7 @@ export function focusFeatureOnMap(
     type: "Polygon" | "MultiPolygon";
     coordinates: number[][][] | number[][][][];
   },
-  padding: [number, number, number, number] = [80, 420, 80, 80],
+  padding: [number, number, number, number] = MAP_FIT_PADDING_OPEN,
 ) {
   const AMap = window.AMap;
   const focusPolygon = new AMap.Polygon({

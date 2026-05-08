@@ -27,11 +27,11 @@
 
 :root {
   --drawer-width: 480px;
-  --color-accent: #3b82f6;
-  --color-bg: #0a0a0a;
-  --color-surface: #171717;
-  --color-surface-elevated: #262626;
-  --color-border: rgba(255, 255, 255, 0.08);
+  --color-accent: #6ea8d7;
+  --color-bg: #081018;
+  --color-surface: rgba(11, 18, 26, 0.88);
+  --color-surface-elevated: rgba(18, 28, 39, 0.96);
+  --color-border: rgba(205, 220, 235, 0.12);
 }
 
 body {
@@ -42,10 +42,9 @@ body {
   overflow: hidden;
 }
 
-/* 隐藏地图的高德 Logo 和 Copyright */
 .amap-logo,
 .amap-copyright {
-  display: none !important;
+  display: block !important;
 }
 
 /* MdEditor Custom Theme */

@@ -2,22 +2,23 @@ import { useEffect, useRef, useCallback } from "react";
 import type { GeoFeature } from "../geoTypes";
 import { focusFeatureOnMap, loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
 import { useMapStore } from "../mapStore";
+import { MAP_FIT_PADDING_CLOSED, PROVINCE_LAYER_TOKENS } from "../mapLayout.js";
 
 const NORMAL_STYLE = {
-  strokeColor: "#f59e0b",
-  strokeWeight: 3.4,
-  strokeOpacity: 1,
-  fillColor: "#f59e0b",
-  fillOpacity: 0.01,
+  strokeColor: PROVINCE_LAYER_TOKENS.stroke,
+  strokeWeight: 2.2,
+  strokeOpacity: 0.92,
+  fillColor: PROVINCE_LAYER_TOKENS.fill,
+  fillOpacity: 0.035,
   cursor: "pointer" as const,
   zIndex: 60,
 };
 
 const HOVER_STYLE = {
-  strokeColor: "#fbbf24",
-  strokeWeight: 4.6,
+  strokeColor: PROVINCE_LAYER_TOKENS.hoverStroke,
+  strokeWeight: 3.2,
   strokeOpacity: 1,
-  fillColor: "#f59e0b",
+  fillColor: PROVINCE_LAYER_TOKENS.hoverFill,
   fillOpacity: 0.08,
   cursor: "pointer" as const,
   zIndex: 70,
@@ -55,7 +56,7 @@ export function ProvinceLayer({ map }: { map: any }) {
         style: {
           "background-color": "rgba(15, 23, 42, 0.92)",
           "color": "#fff",
-          "border": "1px solid rgba(251, 191, 36, 0.45)",
+          "border": `1px solid ${PROVINCE_LAYER_TOKENS.labelBorder}`,
           "border-radius": "9999px",
           "padding": "6px 10px",
           "font-size": "12px",
@@ -115,9 +116,9 @@ export function ProvinceLayer({ map }: { map: any }) {
           polygonRings.forEach((ring) => {
             const outline = new AMap.Polyline({
               path: ring,
-              strokeColor: "#fbbf24",
-              strokeOpacity: 1,
-              strokeWeight: 3,
+              strokeColor: PROVINCE_LAYER_TOKENS.stroke,
+              strokeOpacity: 0.86,
+              strokeWeight: 1.8,
               strokeStyle: "solid",
               lineJoin: "round",
               lineCap: "round",
@@ -133,7 +134,7 @@ export function ProvinceLayer({ map }: { map: any }) {
       outlinesRef.current = outlines;
       map.add(polygons);
       map.add(outlines);
-      map.setFitView(polygons, false, [60, 60, 60, 60]);
+      map.setFitView(polygons, false, MAP_FIT_PADDING_CLOSED);
     });
 
     return () => {

@@ -1,19 +1,15 @@
-import { useRef, type MouseEvent } from "react";
 import { useMapStore } from "./mapStore";
 
 export function BreadCrumbOverlay() {
   const level = useMapStore((s) => s.level);
   const provinceName = useMapStore((s) => s.provinceName);
   const cityName = useMapStore((s) => s.cityName);
-  const drawerOpen = useMapStore((s) => s.drawerOpen);
   const backToCountry = useMapStore((s) => s.backToCountry);
   const backToProvince = useMapStore((s) => s.backToProvince);
-  const setDrawerOpen = useMapStore((s) => s.setDrawerOpen);
   const addingPoi = useMapStore((s) => s.addingPoi);
   const poiDraft = useMapStore((s) => s.poiDraft);
   const startAddPoi = useMapStore((s) => s.startAddPoi);
   const cancelAddPoi = useMapStore((s) => s.cancelAddPoi);
-  const suppressDrawerClickRef = useRef(false);
   const instruction =
     level === "country"
       ? "单击省份进入省级"
@@ -21,23 +17,7 @@ export function BreadCrumbOverlay() {
         ? "单击城市打开详情"
         : addingPoi
           ? "单击地图选择地标位置"
-          : `当前详情抽屉${drawerOpen ? "已打开" : "已收起"}`;
-
-  const runDrawerToggle = (
-    event: MouseEvent<HTMLButtonElement>,
-    source: "mouseDown" | "click",
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (source === "click" && suppressDrawerClickRef.current) {
-      suppressDrawerClickRef.current = false;
-      return;
-    }
-
-    suppressDrawerClickRef.current = source === "mouseDown";
-    setDrawerOpen(!drawerOpen);
-  };
+          : "单击右侧把手展开或收起侧栏";
 
   return (
     <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 text-xs">
@@ -94,20 +74,6 @@ export function BreadCrumbOverlay() {
           </button>
         )}
 
-        {level !== "country" && (
-          <button
-            onMouseDown={(e) => {
-              runDrawerToggle(e, "mouseDown");
-            }}
-            onClick={(e) => {
-              runDrawerToggle(e, "click");
-            }}
-            type="button"
-            className="ml-2 rounded border border-white/10 bg-black/35 px-2 py-1 text-[10px] text-neutral-200 transition-colors hover:bg-black/55 hover:text-white"
-          >
-            {drawerOpen ? "收起详情" : "展开详情"}
-          </button>
-        )}
       </div>
 
       <div className="rounded-lg border border-white/8 bg-black/45 px-3 py-2 text-[11px] text-neutral-200 backdrop-blur-md">

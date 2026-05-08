@@ -13,6 +13,7 @@ export function MapView() {
   const mapRef = useRef<any>(null);
   const [map, setMap] = useState<any>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [boundaryWarning, setBoundaryWarning] = useState<string | null>(null);
   const level = useMapStore((s) => s.level);
   const provinceId = useMapStore((s) => s.provinceId);
   const cityId = useMapStore((s) => s.cityId);
@@ -73,6 +74,12 @@ export function MapView() {
     };
   }, []);
 
+  useEffect(() => {
+    if (level === "country") {
+      setBoundaryWarning(null);
+    }
+  }, [level]);
+
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
@@ -83,12 +90,22 @@ export function MapView() {
         </div>
       )}
 
+      {boundaryWarning && (
+        <div className="absolute left-4 top-28 z-30 rounded-md border border-white/10 bg-black/70 px-3 py-2 text-xs text-neutral-200 backdrop-blur">
+          {boundaryWarning}
+        </div>
+      )}
+
       {level === "country" && map && <ProvinceLayer map={map} />}
 
       {level === "country" && map && <ProvinceTagOverlay map={map} />}
 
       {(level === "province" || level === "city") && map && provinceId && (
-        <CityLayer map={map} provinceId={provinceId} />
+        <CityLayer
+          map={map}
+          provinceId={provinceId}
+          onBoundaryWarning={setBoundaryWarning}
+        />
       )}
 
       {level === "city" && map && cityId && (

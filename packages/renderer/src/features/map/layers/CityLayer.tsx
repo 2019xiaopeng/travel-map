@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { GeoFeature } from "../geoTypes";
-import { focusFeatureOnMap, loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths, featureCenter } from "../geoUtils";
+import { loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths, featureCenter } from "../geoUtils";
 import { useMapStore } from "../mapStore";
+import { CITY_LAYER_TOKENS } from "../mapLayout.js";
 
 interface RawMasterFeature {
   type: "Feature";
@@ -69,60 +70,16 @@ function toGeoFeature(feature: RawMasterFeature): GeoFeature | null {
   };
 }
 
-function resolveMapCenter(map: any): [number, number] {
-  const center = map?.getCenter?.();
-  const lng = typeof center?.getLng === "function" ? center.getLng() : center?.lng;
-  const lat = typeof center?.getLat === "function" ? center.getLat() : center?.lat;
-
-  if (typeof lng === "number" && typeof lat === "number") {
-    return [lng, lat];
-  }
-
-  return [104.5, 35.5];
+export function hasRealCityBoundaryData(features: GeoFeature[]) {
+  return features.length > 0;
 }
 
-function rectangleAround(center: [number, number], radiusLng: number, radiusLat: number) {
-  const [lng, lat] = center;
-  return [[
-    [lng - radiusLng, lat - radiusLat],
-    [lng + radiusLng, lat - radiusLat],
-    [lng + radiusLng, lat + radiusLat],
-    [lng - radiusLng, lat + radiusLat],
-    [lng - radiusLng, lat - radiusLat],
-  ]];
-}
-
-function buildFallbackCities(provinceAdcode: string, center: [number, number]): GeoFeature[] {
-  const offsets: Array<[number, number]> = [
-    [-0.75, 0.45],
-    [0.8, 0.3],
-    [0.05, -0.75],
-  ];
-
-  return offsets.map(([offsetLng, offsetLat], index) => {
-    const cityCenter: [number, number] = [center[0] + offsetLng, center[1] + offsetLat];
-
-    return {
-      type: "Feature",
-      properties: {
-        id: `${provinceAdcode}-mock-${index + 1}`,
-        name: `示例区域${index + 1}`,
-        center: cityCenter,
-      },
-      geometry: {
-        type: "Polygon",
-        coordinates: rectangleAround(cityCenter, 0.42, 0.28),
-      },
-    };
-  });
-}
-
-async function loadLocalCities(provinceId: string, map: any): Promise<GeoFeature[]> {
+async function loadLocalCities(provinceId: string): Promise<GeoFeature[]> {
   const provinceAdcode = normalizeProvinceAdcode(provinceId);
 
   try {
     const dedicated = await loadGeoJson(`provinces/${provinceAdcode}.json`);
-    if (dedicated.features.length > 0) return dedicated.features;
+    if (hasRealCityBoundaryData(dedicated.features)) return dedicated.features;
   } catch {
     // Fall through to the merged static dataset.
   }
@@ -139,57 +96,53 @@ async function loadLocalCities(provinceId: string, map: any): Promise<GeoFeature
         .map(toGeoFeature)
         .filter((item): item is GeoFeature => item !== null);
 
-      if (cityMatches.length > 0) return cityMatches;
-
-      const provincePrefix = provinceAdcode.slice(0, 2);
-      const districtMatches = allFeatures
-        .filter((item) => item.properties?.level === "district")
-        .filter((item) => {
-          const adcode = toAdcode(item.properties?.adcode);
-          return adcode?.startsWith(provincePrefix) ?? false;
-        })
-        .map(toGeoFeature)
-        .filter((item): item is GeoFeature => item !== null);
-
-      if (districtMatches.length > 0) return districtMatches;
+      if (hasRealCityBoundaryData(cityMatches)) return cityMatches;
     }
   } catch {
-    // Fall through to local rectangle examples.
+    // Fall through to no-boundary mode.
   }
 
-  return buildFallbackCities(provinceAdcode, resolveMapCenter(map));
+  return [];
 }
 
 const NORMAL_STYLE = {
-  strokeColor: "#38bdf8",
-  strokeWeight: 2.8,
-  strokeOpacity: 1,
-  fillColor: "#0ea5e9",
-  fillOpacity: 0.01,
+  strokeColor: CITY_LAYER_TOKENS.stroke,
+  strokeWeight: 1.8,
+  strokeOpacity: 0.92,
+  fillColor: CITY_LAYER_TOKENS.fill,
+  fillOpacity: 0.06,
   cursor: "pointer" as const,
   zIndex: 70,
 };
 
 const HOVER_STYLE = {
-  strokeColor: "#7dd3fc",
-  strokeWeight: 3.6,
+  strokeColor: CITY_LAYER_TOKENS.hoverStroke,
+  strokeWeight: 2.4,
   strokeOpacity: 1,
-  fillColor: "#38bdf8",
-  fillOpacity: 0.08,
+  fillColor: CITY_LAYER_TOKENS.hoverFill,
+  fillOpacity: 0.12,
   cursor: "pointer" as const,
   zIndex: 80,
 };
 
 const SELECTED_STYLE = {
-  strokeColor: "#22d3ee",
-  strokeWeight: 4,
+  strokeColor: CITY_LAYER_TOKENS.selectedStroke,
+  strokeWeight: 2.8,
   strokeOpacity: 1,
-  fillColor: "#06b6d4",
-  fillOpacity: 0.12,
+  fillColor: CITY_LAYER_TOKENS.selectedFill,
+  fillOpacity: 0.16,
   zIndex: 90,
 };
 
-export function CityLayer({ map, provinceId }: { map: any; provinceId: string | null }) {
+export function CityLayer({
+  map,
+  provinceId,
+  onBoundaryWarning,
+}: {
+  map: any;
+  provinceId: string | null;
+  onBoundaryWarning?: (message: string | null) => void;
+}) {
   const polygonsRef = useRef<any[]>([]);
   const labelsRef = useRef<any[]>([]);
   const outlinesRef = useRef<any[]>([]);
@@ -222,8 +175,18 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
 
     let cancelled = false;
 
-    loadLocalCities(provinceId, map).then((features) => {
+    loadLocalCities(provinceId).then((features) => {
       if (cancelled) return;
+
+      if (!hasRealCityBoundaryData(features)) {
+        onBoundaryWarning?.("当前省份暂无城市边界数据，仍可查看省级信息。");
+        polygonsRef.current = [];
+        labelsRef.current = [];
+        outlinesRef.current = [];
+        return;
+      }
+
+      onBoundaryWarning?.(null);
 
       const AMap = window.AMap;
       const polygons = features.map((feature) => {
@@ -241,7 +204,6 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
         polygon.on("click", () => {
           const { id, name } = feature.properties;
           enterCity(id, name);
-          focusFeatureOnMap(map, feature.geometry);
         });
 
         polygon.on("mouseover", () => {
@@ -270,9 +232,9 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
           polygonRings.map((ring) =>
             new AMap.Polyline({
               path: ring,
-              strokeColor: "#38bdf8",
-              strokeOpacity: 0.95,
-              strokeWeight: 2.4,
+              strokeColor: CITY_LAYER_TOKENS.stroke,
+              strokeOpacity: 0.8,
+              strokeWeight: 1.45,
               strokeStyle: "solid",
               lineJoin: "round",
               lineCap: "round",
@@ -288,11 +250,11 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
           position: feature.properties.center,
           anchor: "center",
           style: {
-            "background-color": "rgba(14, 165, 233, 0.14)",
-            "border": "1px solid rgba(125, 211, 252, 0.28)",
+            "background-color": CITY_LAYER_TOKENS.labelBg,
+            "border": `1px solid ${CITY_LAYER_TOKENS.labelBorder}`,
             "border-radius": "9999px",
             "padding": "3px 7px",
-            "color": "#bae6fd",
+            "color": CITY_LAYER_TOKENS.labelText,
             "font-size": "10px",
             "font-weight": "600",
             "box-shadow": "0 4px 10px rgba(0, 0, 0, 0.24)",
@@ -304,7 +266,6 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
         label.on("click", () => {
           const { id, name } = feature.properties;
           enterCity(id, name);
-          focusFeatureOnMap(map, feature.geometry);
         });
 
         return label;
@@ -337,8 +298,9 @@ export function CityLayer({ map, provinceId }: { map: any; provinceId: string | 
       });
       labelsRef.current = [];
       selectedRef.current = null;
+      onBoundaryWarning?.(null);
     };
-  }, [map, provinceId, enterCity]);
+  }, [map, provinceId, enterCity, onBoundaryWarning]);
 
   return null;
 }
