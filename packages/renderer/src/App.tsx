@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import { Drawer } from "./components/Drawer";
 import { MapView } from "./features/map/MapView";
 import { useMapStore } from "./features/map/mapStore";
@@ -11,6 +11,24 @@ export default function App() {
   const level = useMapStore((s) => s.level);
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
   const closeDrawer = () => setDrawerOpen(false);
+  const suppressDrawerClickRef = useRef(false);
+
+  const runDrawerAction = (
+    event: MouseEvent<HTMLButtonElement>,
+    action: () => void,
+    source: "mouseDown" | "click",
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (source === "click" && suppressDrawerClickRef.current) {
+      suppressDrawerClickRef.current = false;
+      return;
+    }
+
+    suppressDrawerClickRef.current = source === "mouseDown";
+    action();
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -33,10 +51,12 @@ export default function App() {
         <header className="absolute top-4 right-4 z-50 flex items-center gap-2">
           <button
             onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggleDrawer();
+              runDrawerAction(e, toggleDrawer, "mouseDown");
             }}
+            onClick={(e) => {
+              runDrawerAction(e, toggleDrawer, "click");
+            }}
+            type="button"
             className="
               rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs text-neutral-200
               backdrop-blur-md transition-colors hover:bg-black/60 hover:text-white
@@ -46,10 +66,12 @@ export default function App() {
           </button>
           <button
             onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              closeDrawer();
+              runDrawerAction(e, closeDrawer, "mouseDown");
             }}
+            onClick={(e) => {
+              runDrawerAction(e, closeDrawer, "click");
+            }}
+            type="button"
             className="
               rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs text-neutral-200
               backdrop-blur-md transition-colors hover:bg-black/60 hover:text-white

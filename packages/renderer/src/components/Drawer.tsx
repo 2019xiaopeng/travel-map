@@ -1,4 +1,4 @@
-import { useState, useEffect, type MouseEvent } from "react";
+import { useState, useEffect, useRef, type MouseEvent } from "react";
 import { useMapStore } from "../features/map/mapStore";
 import { CityHome } from "./drawer/CityHome";
 import { TripList } from "./drawer/TripList";
@@ -29,18 +29,38 @@ export function Drawer({ open, onClose, onToggle }: DrawerProps) {
   
   const [view, setView] = useState<DrawerView>("city-home");
   const [previousView, setPreviousView] = useState<DrawerView>("city-home");
+  const suppressToggleClickRef = useRef(false);
+  const suppressCloseClickRef = useRef(false);
 
-  const handleToggleMouseDown = (e: MouseEvent<HTMLButtonElement>) => {
+  const runButtonAction = (
+    e: MouseEvent<HTMLButtonElement>,
+    action: () => void,
+    source: "mouseDown" | "click",
+    suppressRef: React.MutableRefObject<boolean>,
+  ) => {
     e.preventDefault();
     e.stopPropagation();
-    onToggle();
+
+    if (source === "click" && suppressRef.current) {
+      suppressRef.current = false;
+      return;
+    }
+
+    suppressRef.current = source === "mouseDown";
+    action();
   };
 
-  const handleCloseMouseDown = (e: MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onClose();
-  };
+  const handleToggleMouseDown = (e: MouseEvent<HTMLButtonElement>) =>
+    runButtonAction(e, onToggle, "mouseDown", suppressToggleClickRef);
+
+  const handleToggleClick = (e: MouseEvent<HTMLButtonElement>) =>
+    runButtonAction(e, onToggle, "click", suppressToggleClickRef);
+
+  const handleCloseMouseDown = (e: MouseEvent<HTMLButtonElement>) =>
+    runButtonAction(e, onClose, "mouseDown", suppressCloseClickRef);
+
+  const handleCloseClick = (e: MouseEvent<HTMLButtonElement>) =>
+    runButtonAction(e, onClose, "click", suppressCloseClickRef);
 
   useEffect(() => {
     if (!open) {
@@ -64,6 +84,8 @@ export function Drawer({ open, onClose, onToggle }: DrawerProps) {
     <div className="absolute top-0 right-0 bottom-0 z-40">
       <button
         onMouseDown={handleToggleMouseDown}
+        onClick={handleToggleClick}
+        type="button"
         className="
           absolute top-1/2 z-50 flex -translate-y-1/2 items-center gap-2 rounded-full border border-white/10
           bg-[var(--color-surface)]/90 px-4 py-2 text-xs font-medium text-white shadow-xl backdrop-blur-md
@@ -113,6 +135,8 @@ export function Drawer({ open, onClose, onToggle }: DrawerProps) {
           )}
           <button
             onMouseDown={handleCloseMouseDown}
+            onClick={handleCloseClick}
+            type="button"
             className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-white/8 hover:text-white"
           >
             ✕
