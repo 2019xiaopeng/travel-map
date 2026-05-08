@@ -3,7 +3,7 @@ import type { GeoFeature } from "../geoTypes";
 import { focusFeatureOnMap, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
 import { useMapStore } from "../mapStore";
 import { MAP_FIT_PADDING_CLOSED, PROVINCE_LAYER_TOKENS } from "../mapLayout.js";
-import { loadProvinceBoundaries } from "../provinceBoundaries";
+import { loadLocalProvinceBoundaries, loadProvinceBoundaries } from "../provinceBoundaries";
 
 const NORMAL_STYLE = {
   strokeColor: PROVINCE_LAYER_TOKENS.stroke,
@@ -43,36 +43,26 @@ export function ProvinceLayer({ map }: { map: any }) {
     [map, enterProvince],
   );
 
-  useEffect(() => {
-    if (!map) return;
+  const clearLayers = useCallback(() => {
+    polygonsRef.current.forEach((p) => {
+      p.off("click");
+      p.off("mouseover");
+      p.off("mousemove");
+      p.off("mouseout");
+      p.setMap(null);
+    });
+    polygonsRef.current = [];
 
-    let cancelled = false;
-    const AMap = window.AMap;
+    outlinesRef.current.forEach((outline) => {
+      outline.setMap(null);
+    });
+    outlinesRef.current = [];
+  }, []);
 
-    if (!tooltipRef.current) {
-      tooltipRef.current = new AMap.Text({
-        text: "",
-        anchor: "bottom-center",
-        offset: new AMap.Pixel(0, -10),
-        style: {
-          "background-color": "rgba(15, 23, 42, 0.92)",
-          "color": "#fff",
-          "border": `1px solid ${PROVINCE_LAYER_TOKENS.labelBorder}`,
-          "border-radius": "9999px",
-          "padding": "6px 10px",
-          "font-size": "12px",
-          "font-weight": "600",
-          "box-shadow": "0 8px 18px rgba(0,0,0,0.35)",
-          "pointer-events": "none",
-        },
-        visible: false,
-        zIndex: 100,
-      });
-      tooltipRef.current.setMap(map);
-    }
-
-    loadProvinceBoundaries().then((features) => {
-      if (cancelled) return;
+  const renderFeatures = useCallback(
+    (features: GeoFeature[], fitView: boolean) => {
+      const AMap = window.AMap;
+      clearLayers();
 
       const polygons: any[] = [];
       const outlines: any[] = [];
@@ -128,36 +118,68 @@ export function ProvinceLayer({ map }: { map: any }) {
             outlines.push(outline);
           });
         });
-
       });
 
       polygonsRef.current = polygons;
       outlinesRef.current = outlines;
       map.add(polygons);
       map.add(outlines);
-      map.setFitView(polygons, false, MAP_FIT_PADDING_CLOSED);
+      if (fitView) {
+        map.setFitView(polygons, false, MAP_FIT_PADDING_CLOSED);
+      }
+    },
+    [clearLayers, handleClick, map],
+  );
+
+  useEffect(() => {
+    if (!map) return;
+
+    let cancelled = false;
+    const AMap = window.AMap;
+
+    if (!tooltipRef.current) {
+      tooltipRef.current = new AMap.Text({
+        text: "",
+        anchor: "bottom-center",
+        offset: new AMap.Pixel(0, -10),
+        style: {
+          "background-color": "rgba(15, 23, 42, 0.92)",
+          "color": "#fff",
+          "border": `1px solid ${PROVINCE_LAYER_TOKENS.labelBorder}`,
+          "border-radius": "9999px",
+          "padding": "6px 10px",
+          "font-size": "12px",
+          "font-weight": "600",
+          "box-shadow": "0 8px 18px rgba(0,0,0,0.35)",
+          "pointer-events": "none",
+        },
+        visible: false,
+        zIndex: 100,
+      });
+      tooltipRef.current.setMap(map);
+    }
+
+    loadLocalProvinceBoundaries().then((features) => {
+      if (!cancelled) {
+        renderFeatures(features, true);
+      }
+    });
+
+    loadProvinceBoundaries().then((features) => {
+      if (!cancelled) {
+        renderFeatures(features, false);
+      }
     });
 
     return () => {
       cancelled = true;
-      polygonsRef.current.forEach((p) => {
-        p.off("click");
-        p.off("mouseover");
-        p.off("mousemove");
-        p.off("mouseout");
-        p.setMap(null);
-      });
-      polygonsRef.current = [];
-      outlinesRef.current.forEach((outline) => {
-        outline.setMap(null);
-      });
-      outlinesRef.current = [];
+      clearLayers();
       if (tooltipRef.current) {
         tooltipRef.current.setMap(null);
         tooltipRef.current = null;
       }
     };
-  }, [map, handleClick]);
+  }, [map, clearLayers, renderFeatures]);
 
   return null;
 }

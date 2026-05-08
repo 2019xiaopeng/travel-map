@@ -116,25 +116,30 @@ async function searchProvinceBoundary(metadata: GeoFeature): Promise<GeoFeature>
   });
 }
 
+export async function loadLocalProvinceBoundaries(): Promise<GeoFeature[]> {
+  const geo = await loadGeoJson("china-provinces.json");
+  return geo.features.map((feature) => ({
+    ...feature,
+    properties: {
+      ...feature.properties,
+      id: normalizeAdcode(feature.properties.id),
+    },
+  }));
+}
+
 export async function loadProvinceBoundaries(): Promise<GeoFeature[]> {
   if (provinceBoundariesPromise) return provinceBoundariesPromise;
 
   provinceBoundariesPromise = (async () => {
-    const geo = await loadGeoJson("china-provinces.json");
+    const localFeatures = await loadLocalProvinceBoundaries();
 
     try {
       const features = await Promise.all(
-        geo.features.map((feature) => searchProvinceBoundary(feature)),
+        localFeatures.map((feature) => searchProvinceBoundary(feature)),
       );
       return features;
     } catch {
-      return geo.features.map((feature) => ({
-        ...feature,
-        properties: {
-          ...feature.properties,
-          id: normalizeAdcode(feature.properties.id),
-        },
-      }));
+      return localFeatures;
     }
   })();
 

@@ -3,7 +3,7 @@ import type { GeoFeature } from "./geoTypes";
 import { focusFeatureOnMap } from "./geoUtils";
 import { useMapStore } from "./mapStore";
 import { PROVINCE_LAYER_TOKENS } from "./mapLayout.js";
-import { loadProvinceBoundaries } from "./provinceBoundaries";
+import { loadLocalProvinceBoundaries, loadProvinceBoundaries } from "./provinceBoundaries";
 
 interface ProvinceTagOverlayProps {
   map: any;
@@ -63,6 +63,9 @@ export function ProvinceTagOverlay({ map }: ProvinceTagOverlayProps) {
 
   useEffect(() => {
     let cancelled = false;
+    loadLocalProvinceBoundaries().then((provinceFeatures) => {
+      if (!cancelled) setFeatures(provinceFeatures);
+    });
     loadProvinceBoundaries().then((provinceFeatures) => {
       if (!cancelled) setFeatures(provinceFeatures);
     });
