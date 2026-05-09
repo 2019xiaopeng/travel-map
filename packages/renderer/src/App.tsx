@@ -25,9 +25,9 @@ export default function App() {
     if (level !== "province" || !drawerOpen) return;
 
     const frameId = window.requestAnimationFrame(() => {
-      const shell = document.querySelector("[data-drawer-shell='true']");
-      if (!shell) {
-        console.warn("Drawer shell missing after province entry; forcing open state");
+      const panel = document.querySelector("[data-drawer-panel='true']") as HTMLElement | null;
+      if (!panel || panel.getBoundingClientRect().width < 280) {
+        console.warn("Drawer panel missing after province entry; forcing open state");
         setDrawerOpen(true);
       }
     });

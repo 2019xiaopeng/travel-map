@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Capital City Placeholder</title>
+  <desc id="desc">Stylized night skyline illustration for province capital cards.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#112034" />
+      <stop offset="50%" stop-color="#1b3958" />
+      <stop offset="100%" stop-color="#0b1118" />
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" x2="0%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffd78a" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.08" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="720" fill="url(#sky)" />
+  <circle cx="930" cy="120" r="78" fill="#fef3c7" fill-opacity="0.18" />
+  <circle cx="930" cy="120" r="52" fill="#fde68a" fill-opacity="0.22" />
+  <path d="M0 520 C180 470 260 560 430 520 C640 470 760 560 930 520 C1040 492 1120 500 1200 520 V720 H0 Z" fill="#0a0f15" />
+  <path d="M0 540 C220 500 330 586 520 548 C730 506 860 590 1200 532 V720 H0 Z" fill="#0f1722" />
+  <g fill="#182330">
+    <rect x="86" y="382" width="112" height="226" rx="4" />
+    <rect x="210" y="340" width="98" height="268" rx="4" />
+    <rect x="326" y="298" width="144" height="310" rx="4" />
+    <rect x="494" y="354" width="118" height="254" rx="4" />
+    <rect x="632" y="256" width="160" height="352" rx="4" />
+    <rect x="822" y="332" width="106" height="276" rx="4" />
+    <rect x="948" y="286" width="126" height="322" rx="4" />
+  </g>
+  <g fill="#f8fafc" fill-opacity="0.78">
+    <rect x="110" y="412" width="10" height="18" rx="2" />
+    <rect x="136" y="412" width="10" height="18" rx="2" />
+    <rect x="162" y="412" width="10" height="18" rx="2" />
+    <rect x="238" y="370" width="10" height="18" rx="2" />
+    <rect x="264" y="370" width="10" height="18" rx="2" />
+    <rect x="350" y="330" width="12" height="20" rx="2" />
+    <rect x="380" y="330" width="12" height="20" rx="2" />
+    <rect x="410" y="330" width="12" height="20" rx="2" />
+    <rect x="530" y="388" width="10" height="18" rx="2" />
+    <rect x="558" y="388" width="10" height="18" rx="2" />
+    <rect x="678" y="298" width="12" height="22" rx="2" />
+    <rect x="710" y="298" width="12" height="22" rx="2" />
+    <rect x="742" y="298" width="12" height="22" rx="2" />
+    <rect x="856" y="362" width="10" height="18" rx="2" />
+    <rect x="882" y="362" width="10" height="18" rx="2" />
+    <rect x="982" y="318" width="12" height="20" rx="2" />
+    <rect x="1014" y="318" width="12" height="20" rx="2" />
+  </g>
+  <rect x="0" y="0" width="1200" height="720" fill="url(#glow)" />
+</svg>

@@ -298,6 +298,7 @@ export function CityLayer({
   const selectedRef = useRef<any>(null);
   const enterCity = useMapStore((s) => s.enterCity);
   const cityId = useMapStore((s) => s.cityId);
+  const setProvinceCityFeatures = useMapStore((s) => s.setProvinceCityFeatures);
 
   // Update selection highlight when cityId changes
   useEffect(() => {
@@ -323,9 +324,11 @@ export function CityLayer({
     if (!map || !provinceId) return;
 
     let cancelled = false;
+    setProvinceCityFeatures([]);
 
     loadProvinceCities(provinceId).then((features) => {
       if (cancelled) return;
+      setProvinceCityFeatures(features);
 
       if (!hasRealCityBoundaryData(features)) {
         onBoundaryWarning?.("当前省份暂无城市边界数据，仍可查看省级信息。");
@@ -448,8 +451,9 @@ export function CityLayer({
       labelsRef.current = [];
       selectedRef.current = null;
       onBoundaryWarning?.(null);
+      setProvinceCityFeatures([]);
     };
-  }, [map, provinceId, enterCity, onBoundaryWarning]);
+  }, [map, provinceId, enterCity, onBoundaryWarning, setProvinceCityFeatures]);
 
   return null;
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { GeoFeature } from "./geoTypes";
 
 export type MapLevel = "country" | "province" | "city";
 
@@ -8,6 +9,7 @@ interface MapState {
   provinceName: string | null;
   cityId: string | null;
   cityName: string | null;
+  provinceCityFeatures: GeoFeature[];
   drawerOpen: boolean;
   selectedPoiId: string | null;
   selectedTripId: string | null;
@@ -20,6 +22,7 @@ interface MapState {
   backToCountry: () => void;
   backToProvince: () => void;
   setDrawerOpen: (open: boolean) => void;
+  setProvinceCityFeatures: (features: GeoFeature[]) => void;
   selectPoi: (poiId: string | null) => void;
   selectTrip: (tripId: string | null) => void;
   startAddPoi: () => void;
@@ -34,6 +37,7 @@ export const useMapStore = create<MapState>((set) => ({
   provinceName: null,
   cityId: null,
   cityName: null,
+  provinceCityFeatures: [],
   drawerOpen: false,
   selectedPoiId: null,
   selectedTripId: null,
@@ -47,6 +51,7 @@ export const useMapStore = create<MapState>((set) => ({
       provinceName: name,
       cityId: null,
       cityName: null,
+      provinceCityFeatures: [],
       drawerOpen: true,
       selectedPoiId: null,
       selectedTripId: null,
@@ -61,6 +66,7 @@ export const useMapStore = create<MapState>((set) => ({
       provinceName: name,
       cityId: null,
       cityName: null,
+      provinceCityFeatures: [],
       drawerOpen: true,
       selectedPoiId: null,
       selectedTripId: null,
@@ -87,6 +93,7 @@ export const useMapStore = create<MapState>((set) => ({
       provinceName: null,
       cityId: null,
       cityName: null,
+      provinceCityFeatures: [],
       drawerOpen: false,
       selectedPoiId: null,
       selectedTripId: null,
@@ -107,6 +114,7 @@ export const useMapStore = create<MapState>((set) => ({
     }),
 
   setDrawerOpen: (open) => set({ drawerOpen: open }),
+  setProvinceCityFeatures: (features) => set({ provinceCityFeatures: features }),
   selectPoi: (poiId) => set({ selectedPoiId: poiId, drawerOpen: true }),
   selectTrip: (tripId) => set({ selectedTripId: tripId }),
   startAddPoi: () => set({ addingPoi: true, poiDraft: null }),
