@@ -14,13 +14,13 @@ export const PROVINCE_LAYER_TOKENS = {
 };
 
 export const CITY_LAYER_TOKENS = {
-  stroke: "#5f8db4",
-  hoverStroke: "#95c4eb",
-  selectedStroke: "#cfe7ff",
+  stroke: "#4f7ca6",
+  hoverStroke: "#8ec0f0",
+  selectedStroke: "#d6ebff",
   fill: "#173047",
-  hoverFill: "#1e425f",
-  selectedFill: "#26567b",
-  labelBorder: "rgba(149, 196, 235, 0.24)",
-  labelBg: "rgba(9, 18, 28, 0.76)",
+  hoverFill: "#27557d",
+  selectedFill: "#326b99",
+  labelBorder: "rgba(142, 192, 240, 0.26)",
+  labelBg: "rgba(9, 18, 28, 0.8)",
   labelText: "#d8ebfb",
 };

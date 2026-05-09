@@ -3,6 +3,8 @@ export interface GeoFeatureProperties {
   name: string;
   center: [number, number];
   fullname?: string;
+  level?: string;
+  parentAdcode?: string;
   labelAnchor?: [number, number];
   visualCenter?: [number, number];
   bounds?: {

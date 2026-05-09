@@ -4,6 +4,9 @@ import { loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths, featureCe
 import { useMapStore } from "../mapStore";
 import { CITY_LAYER_TOKENS } from "../mapLayout.js";
 import { buildProvinceBoundaryUrl } from "../provinceBoundaryUrl.ts";
+import { pickProvinceSubdivisionFeatures } from "../cityBoundaryScope.ts";
+import { normalizeFeatureLabelProps, pickLabelAnchor } from "../cityLabelAnchor.ts";
+import { openCityExperience } from "../cityExperience.ts";
 
 interface RawMasterFeature {
   type: "Feature";
@@ -11,7 +14,9 @@ interface RawMasterFeature {
     id?: string | number;
     adcode?: string | number;
     name?: string;
+    fullname?: string;
     center?: [number, number] | number[];
+    centroid?: [number, number] | number[];
     level?: string;
     parent?: {
       adcode?: string | number;
@@ -37,6 +42,7 @@ interface RawTopologyGeometry {
     code?: string | number;
     adcode?: string | number;
     center?: [number, number] | number[];
+    centroid?: [number, number] | number[];
   };
 }
 
@@ -88,16 +94,23 @@ function toGeoFeature(feature: RawMasterFeature): GeoFeature | null {
 
   const name = (feature.properties?.name ?? id).toString();
   const center = toCenter(feature.properties?.center);
+  const centroid = toCenter(feature.properties?.centroid);
+  const parentAdcode = toAdcode(feature.properties?.parent?.adcode);
 
-  return {
+  return normalizeFeatureLabelProps({
     type: "Feature",
     properties: {
       id,
       name,
+      fullname: feature.properties?.fullname,
       center: center ?? featureCenter(geometry),
+      level: feature.properties?.level,
+      parentAdcode: parentAdcode ?? undefined,
     },
     geometry,
-  };
+  }, {
+    centroid: centroid ?? undefined,
+  });
 }
 
 function decodeTopologyArc(
@@ -177,8 +190,9 @@ function topologyToGeoFeatures(topology: RawTopology): GeoFeature[] {
 
       const name = (geometry.properties?.name ?? id).toString();
       const center = toCenter(geometry.properties?.center);
+      const centroid = toCenter(geometry.properties?.centroid);
 
-      return {
+      return normalizeFeatureLabelProps({
         type: "Feature",
         properties: {
           id,
@@ -187,7 +201,9 @@ function topologyToGeoFeatures(topology: RawTopology): GeoFeature[] {
           center: center ?? featureCenter(geoGeometry),
         },
         geometry: geoGeometry,
-      } satisfies GeoFeature;
+      }, {
+        centroid: centroid ?? undefined,
+      }) satisfies GeoFeature;
     })
     .filter((item): item is GeoFeature => item !== null);
 }
@@ -201,7 +217,11 @@ async function loadLocalCities(provinceId: string): Promise<GeoFeature[]> {
 
   try {
     const dedicated = await loadGeoJson(`provinces/${provinceAdcode}.json`);
-    if (hasRealCityBoundaryData(dedicated.features)) return dedicated.features;
+    if (hasRealCityBoundaryData(dedicated.features)) {
+      return dedicated.features.map((feature) =>
+        normalizeFeatureLabelProps(feature),
+      );
+    }
   } catch {
     // Fall through to the merged static dataset.
   }
@@ -210,15 +230,16 @@ async function loadLocalCities(provinceId: string): Promise<GeoFeature[]> {
     const response = await fetch("/geo/china-provinces-cities.geojson");
     if (response.ok) {
       const raw = (await response.json()) as { features?: RawMasterFeature[] };
-      const allFeatures = raw.features ?? [];
-
-      const cityMatches = allFeatures
-        .filter((item) => item.properties?.level === "city")
-        .filter((item) => toAdcode(item.properties?.parent?.adcode) === provinceAdcode)
+      const scoped = (raw.features ?? [])
         .map(toGeoFeature)
         .filter((item): item is GeoFeature => item !== null);
 
-      if (hasRealCityBoundaryData(cityMatches)) return cityMatches;
+      const picked = pickProvinceSubdivisionFeatures({
+        provinceAdcode,
+        features: scoped,
+      });
+
+      if (hasRealCityBoundaryData(picked)) return picked;
     }
   } catch {
     // Fall through to no-boundary mode.
@@ -243,8 +264,13 @@ async function loadProvinceCities(provinceId: string): Promise<GeoFeature[]> {
               .map(toGeoFeature)
               .filter((item): item is GeoFeature => item !== null));
 
-      if (hasRealCityBoundaryData(features)) {
-        return features;
+      const picked = pickProvinceSubdivisionFeatures({
+        provinceAdcode,
+        features,
+      });
+
+      if (hasRealCityBoundaryData(picked)) {
+        return picked;
       }
     }
   } catch (error) {
@@ -296,8 +322,8 @@ export function CityLayer({
   const labelsRef = useRef<any[]>([]);
   const outlinesRef = useRef<any[]>([]);
   const selectedRef = useRef<any>(null);
-  const enterCity = useMapStore((s) => s.enterCity);
   const cityId = useMapStore((s) => s.cityId);
+  const provinceName = useMapStore((s) => s.provinceName);
   const setProvinceCityFeatures = useMapStore((s) => s.setProvinceCityFeatures);
 
   // Update selection highlight when cityId changes
@@ -354,8 +380,14 @@ export function CityLayer({
         });
 
         polygon.on("click", () => {
-          const { id, name } = feature.properties;
-          enterCity(id, name);
+          openCityExperience(map, {
+            provinceId,
+            provinceName: provinceName ?? provinceId,
+            cityId: feature.properties.id,
+            cityName: feature.properties.name,
+            center: feature.properties.labelAnchor ?? feature.properties.center,
+            geometry: feature.geometry,
+          });
         });
 
         polygon.on("mouseover", () => {
@@ -397,9 +429,16 @@ export function CityLayer({
       });
 
       const labels = features.map((feature) => {
+        const anchor =
+          feature.properties.labelAnchor ??
+          feature.properties.visualCenter ??
+          pickLabelAnchor({
+            center: feature.properties.center,
+            geometry: feature.geometry,
+          });
         const label = new AMap.Text({
           text: feature.properties.name,
-          position: feature.properties.center,
+          position: anchor,
           anchor: "center",
           style: {
             "background-color": CITY_LAYER_TOKENS.labelBg,
@@ -416,8 +455,14 @@ export function CityLayer({
         });
 
         label.on("click", () => {
-          const { id, name } = feature.properties;
-          enterCity(id, name);
+          openCityExperience(map, {
+            provinceId,
+            provinceName: provinceName ?? provinceId,
+            cityId: feature.properties.id,
+            cityName: feature.properties.name,
+            center: feature.properties.labelAnchor ?? feature.properties.center,
+            geometry: feature.geometry,
+          });
         });
 
         return label;
@@ -453,7 +498,7 @@ export function CityLayer({
       onBoundaryWarning?.(null);
       setProvinceCityFeatures([]);
     };
-  }, [map, provinceId, enterCity, onBoundaryWarning, setProvinceCityFeatures]);
+  }, [map, provinceId, provinceName, onBoundaryWarning, setProvinceCityFeatures]);
 
   return null;
 }

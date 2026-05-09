@@ -10,6 +10,7 @@ function resetStore() {
     provinceName: null,
     cityId: null,
     cityName: null,
+    provinceCityFeatures: [],
     drawerOpen: false,
     selectedPoiId: null,
     selectedTripId: null,
@@ -50,5 +51,21 @@ test("backToProvince keeps province overview open", () => {
   assert.equal(state.level, "province");
   assert.equal(state.provinceName, "浙江");
   assert.equal(state.cityId, null);
+  assert.equal(state.drawerOpen, true);
+});
+
+test("openCityExperience sets province and city context together", () => {
+  resetStore();
+  useMapStore.getState().openCityExperience({
+    provinceId: "330000",
+    provinceName: "浙江",
+    cityId: "330100",
+    cityName: "杭州",
+  });
+  const state = useMapStore.getState();
+
+  assert.equal(state.level, "city");
+  assert.equal(state.provinceName, "浙江");
+  assert.equal(state.cityName, "杭州");
   assert.equal(state.drawerOpen, true);
 });

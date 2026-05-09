@@ -186,7 +186,7 @@ export function MapView() {
         <PoiLayer map={map} cityId={cityId} />
       )}
 
-      <BreadCrumbOverlay />
+      <BreadCrumbOverlay map={map} />
 
       {level === "city" && addingPoi && !poiDraft && (
         <div className="absolute left-4 top-14 z-20 rounded-md border border-[var(--color-border)] bg-black/70 px-3 py-2 text-xs text-neutral-200 backdrop-blur">
