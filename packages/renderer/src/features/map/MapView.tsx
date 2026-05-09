@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { loadAmapSdk } from "./loadAmapSdk";
 import { useMapStore } from "./mapStore";
 import { ProvinceLayer } from "./layers/ProvinceLayer";
@@ -6,7 +6,6 @@ import { CityLayer } from "./layers/CityLayer";
 import { PoiLayer } from "./layers/PoiLayer";
 import { BreadCrumbOverlay } from "./BreadCrumbOverlay";
 import { PoiAddModal } from "./PoiAddModal";
-import { ProvinceTagOverlay } from "./ProvinceTagOverlay";
 import {
   ProvinceHoverOverlay,
 } from "./ProvinceHoverOverlay";
@@ -36,6 +35,16 @@ export function MapView() {
   const cityId = useMapStore((s) => s.cityId);
   const addingPoi = useMapStore((s) => s.addingPoi);
   const poiDraft = useMapStore((s) => s.poiDraft);
+
+  const handleProvinceHoverChange = useCallback((next: ProvinceHoverState | null) => {
+    setProvinceHover((previous) =>
+      next ? nextProvinceHoverState(previous, next) : clearProvinceHover(previous),
+    );
+  }, []);
+
+  const handleCountryMouseLeave = useCallback(() => {
+    setProvinceHover((previous) => clearProvinceHover(previous));
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -127,9 +136,7 @@ export function MapView() {
       <div
         ref={containerRef}
         className="h-full w-full"
-        onMouseLeave={() => {
-          setProvinceHover((previous) => clearProvinceHover(previous));
-        }}
+        onMouseLeave={handleCountryMouseLeave}
       />
 
       {loadError && (
@@ -161,19 +168,7 @@ export function MapView() {
           map={map}
           features={provinceFeatures}
           hoveredProvinceId={provinceHover?.provinceId ?? null}
-          onProvinceHoverChange={(next) =>
-            setProvinceHover((previous) =>
-              next ? nextProvinceHoverState(previous, next) : clearProvinceHover(previous),
-            )
-          }
-        />
-      )}
-
-      {level === "country" && map && provinceBoundaryStatus === "ready" && (
-        <ProvinceTagOverlay
-          map={map}
-          features={provinceFeatures}
-          hoveredProvinceId={provinceHover?.provinceId ?? null}
+          onProvinceHoverChange={handleProvinceHoverChange}
         />
       )}
 

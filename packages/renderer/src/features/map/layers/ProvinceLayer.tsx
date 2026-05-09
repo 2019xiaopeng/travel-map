@@ -160,7 +160,7 @@ export function ProvinceLayer({
         map.setFitView(polygons, false, MAP_FIT_PADDING_CLOSED);
       }
     },
-    [clearLayers, handleClick, map],
+    [clearLayers, handleClick, map, onProvinceHoverChange],
   );
 
   useEffect(() => {
