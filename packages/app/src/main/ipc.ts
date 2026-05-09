@@ -27,6 +27,23 @@ export function setupIpc() {
     return absolutePath;
   };
 
+  const readJsonIfExists = async (absPath: string) => {
+    try {
+      return JSON.parse(await fs.promises.readFile(absPath, "utf8"));
+    } catch (err: any) {
+      if (err?.code === "ENOENT") return null;
+      throw err;
+    }
+  };
+
+  const writeJsonAtomic = async (absPath: string, value: any) => {
+    const dir = path.dirname(absPath);
+    const tmp = `${absPath}.tmp`;
+    await fs.promises.mkdir(dir, { recursive: true });
+    await fs.promises.writeFile(tmp, JSON.stringify(value, null, 2), "utf8");
+    await fs.promises.rename(tmp, absPath);
+  };
+
   const deleteAssetIfUnreferenced = (assetId: string) => {
     const db = getDb();
     const tagRefs = db.prepare(`
@@ -724,6 +741,29 @@ export function setupIpc() {
       }
       const err = await shell.openPath(absolutePath);
       if (err) return { error: err };
+      return { ok: true };
+    } catch (e: any) {
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle("cache:readProvinceBoundaries", async (event) => {
+    assertSender(event);
+    try {
+      const userDataPath = app.getPath("userData");
+      const absPath = path.join(userDataPath, "cache", "province-boundaries.json");
+      return await readJsonIfExists(absPath);
+    } catch (e: any) {
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle("cache:writeProvinceBoundaries", async (event, payload: any) => {
+    assertSender(event);
+    try {
+      const userDataPath = app.getPath("userData");
+      const absPath = path.join(userDataPath, "cache", "province-boundaries.json");
+      await writeJsonAtomic(absPath, payload);
       return { ok: true };
     } catch (e: any) {
       return { error: e.message };

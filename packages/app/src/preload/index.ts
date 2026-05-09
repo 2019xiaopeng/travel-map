@@ -53,6 +53,11 @@ const api = {
     importBackupZip: () => ipcRenderer.invoke("file:importBackupZip"),
     openLocal: (localPath: string) => ipcRenderer.invoke("file:openLocal", { localPath }),
   },
+  cache: {
+    readProvinceBoundaries: () => ipcRenderer.invoke("cache:readProvinceBoundaries"),
+    writeProvinceBoundaries: (payload: any) =>
+      ipcRenderer.invoke("cache:writeProvinceBoundaries", payload),
+  },
   diagnostics: {
     exportRestoreDiagnostic: (payload?: { reason?: string }) => ipcRenderer.invoke("diagnostics:exportRestoreDiagnostic", payload),
     reveal: (relativePath: string) => ipcRenderer.invoke("diagnostics:reveal", { relativePath }),

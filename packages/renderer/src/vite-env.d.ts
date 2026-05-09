@@ -45,6 +45,10 @@ interface Window {
       importBackupZip: () => Promise<{ ok?: boolean; stagingPath?: string; needsRestart?: boolean; canceled?: boolean; error?: string; warnings?: Array<{ type: string; asset_id?: string; message: string }> }>;
       openLocal: (localPath: string) => Promise<{ ok?: boolean; error?: string }>;
     };
+    cache: {
+      readProvinceBoundaries: () => Promise<any>;
+      writeProvinceBoundaries: (payload: any) => Promise<{ ok?: boolean; error?: string }>;
+    };
     diagnostics: {
       exportRestoreDiagnostic: (payload?: { reason?: string }) => Promise<{ ok?: boolean; relativePath?: string; error?: string }>;
       reveal: (relativePath: string) => Promise<{ ok?: boolean; error?: string }>;
