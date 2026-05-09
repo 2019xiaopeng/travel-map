@@ -8,6 +8,7 @@
     "dev:electron": "pnpm --filter @travel-map/app dev",
     "dev:electron:local": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$nodeDir='F:\\tools\\node-v22.22.2-win-x64'; $env:Path=\\\"$nodeDir;$env:Path\\\"; $env:npm_config_cache='F:\\npm-cache\\travel-map'; $env:pnpm_config_store_dir='F:\\pnpm-store\\travel-map'; $env:ELECTRON_CACHE='F:\\electron-cache\\travel-map'; $env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'; $env:npm_config_better_sqlite3_binary_host='https://registry.npmmirror.com/-/binary/better-sqlite3'; pnpm.cmd --filter @travel-map/app dev\"",
     "build": "pnpm --filter @travel-map/renderer build && pnpm --filter @travel-map/app build",
+    "generate:province-boundaries": "node scripts/generate-province-boundaries.mjs",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r typecheck"
   },
