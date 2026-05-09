@@ -3,6 +3,7 @@ import type { GeoFeature } from "../geoTypes";
 import { loadGeoJson, polygonCoordsToPaths, multiPolygonCoordsToPaths, featureCenter } from "../geoUtils";
 import { useMapStore } from "../mapStore";
 import { CITY_LAYER_TOKENS } from "../mapLayout.js";
+import { buildProvinceBoundaryUrl } from "../provinceBoundaryUrl.ts";
 
 interface RawMasterFeature {
   type: "Feature";
@@ -105,6 +106,28 @@ async function loadLocalCities(provinceId: string): Promise<GeoFeature[]> {
   return [];
 }
 
+async function loadProvinceCities(provinceId: string): Promise<GeoFeature[]> {
+  const provinceAdcode = normalizeProvinceAdcode(provinceId);
+
+  try {
+    const response = await fetch(buildProvinceBoundaryUrl(provinceAdcode));
+    if (response.ok) {
+      const raw = (await response.json()) as { features?: RawMasterFeature[] };
+      const features = (raw.features ?? [])
+        .map(toGeoFeature)
+        .filter((item): item is GeoFeature => item !== null);
+
+      if (hasRealCityBoundaryData(features)) {
+        return features;
+      }
+    }
+  } catch (error) {
+    console.warn("Province city boundary remote load failed:", error);
+  }
+
+  return loadLocalCities(provinceId);
+}
+
 const NORMAL_STYLE = {
   strokeColor: CITY_LAYER_TOKENS.stroke,
   strokeWeight: 1.8,
@@ -175,7 +198,7 @@ export function CityLayer({
 
     let cancelled = false;
 
-    loadLocalCities(provinceId).then((features) => {
+    loadProvinceCities(provinceId).then((features) => {
       if (cancelled) return;
 
       if (!hasRealCityBoundaryData(features)) {

@@ -16,6 +16,6 @@ test("buildCountryBoundaryUrl uses geojson.cn china topo endpoint", () => {
 test("buildProvinceBoundaryUrl swaps china with a 6-digit adcode", () => {
   assert.equal(
     buildProvinceBoundaryUrl("330000"),
-    "https://geojson.cn/api/330000/1.6.3/330000.json",
+    "https://geojson.cn/api/tiandi/100000/330000.json",
   );
 });

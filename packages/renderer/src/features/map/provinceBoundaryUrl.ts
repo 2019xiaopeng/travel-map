@@ -5,5 +5,5 @@ export function buildCountryBoundaryUrl() {
 }
 
 export function buildProvinceBoundaryUrl(provinceAdcode: string) {
-  return `https://geojson.cn/api/${provinceAdcode}/${GEOJSON_CN_VERSION}/${provinceAdcode}.json`;
+  return `https://geojson.cn/api/tiandi/100000/${provinceAdcode}.json`;
 }
