@@ -95,11 +95,18 @@ function normalizeProvinceRecord(rawRecord) {
     SPECIAL_LABEL_ANCHORS.get(rawRecord.id) ?? rawRecord.center;
 
   return {
-    ...rawRecord,
-    bounds: geometryBounds(rawRecord.geometry),
-    visualCenter: rawRecord.center,
-    labelAnchor,
-    sourceVersion: "geojson.cn@1.6.3",
+    type: "Feature",
+    properties: {
+      id: rawRecord.id,
+      name: rawRecord.name,
+      fullname: rawRecord.fullname,
+      center: rawRecord.center,
+      bounds: geometryBounds(rawRecord.geometry),
+      visualCenter: rawRecord.center,
+      labelAnchor,
+      sourceVersion: "geojson.cn@1.6.3",
+    },
+    geometry: rawRecord.geometry,
   };
 }
 
@@ -126,7 +133,18 @@ async function main() {
     );
 
   await fs.mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
-  await fs.writeFile(OUTPUT_PATH, JSON.stringify(provinces, null, 2), "utf8");
+  await fs.writeFile(
+    OUTPUT_PATH,
+    JSON.stringify(
+      {
+        type: "FeatureCollection",
+        features: provinces,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
   console.log(`generated ${provinces.length} provinces`);
 }
 
