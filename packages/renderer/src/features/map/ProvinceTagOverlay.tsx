@@ -3,10 +3,11 @@ import type { GeoFeature } from "./geoTypes";
 import { focusFeatureOnMap } from "./geoUtils";
 import { useMapStore } from "./mapStore";
 import { PROVINCE_LAYER_TOKENS } from "./mapLayout.js";
-import { loadLocalProvinceBoundaries, loadProvinceBoundaries } from "./provinceBoundaries";
 
 interface ProvinceTagOverlayProps {
   map: any;
+  features: GeoFeature[];
+  hoveredProvinceId: string | null;
 }
 
 interface ProvinceTag {
@@ -56,23 +57,13 @@ function projectProvinceTags(map: any, features: GeoFeature[]): ProvinceTag[] {
   return filtered;
 }
 
-export function ProvinceTagOverlay({ map }: ProvinceTagOverlayProps) {
+export function ProvinceTagOverlay({
+  map,
+  features,
+  hoveredProvinceId,
+}: ProvinceTagOverlayProps) {
   const enterProvince = useMapStore((s) => s.enterProvince);
-  const [features, setFeatures] = useState<GeoFeature[]>([]);
   const [version, setVersion] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadLocalProvinceBoundaries().then((provinceFeatures) => {
-      if (!cancelled) setFeatures(provinceFeatures);
-    });
-    loadProvinceBoundaries().then((provinceFeatures) => {
-      if (!cancelled) setFeatures(provinceFeatures);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!map) return;
@@ -118,7 +109,10 @@ export function ProvinceTagOverlay({ map }: ProvinceTagOverlayProps) {
             left,
             top,
             border: `1px solid ${PROVINCE_LAYER_TOKENS.labelBorder}`,
-            backgroundColor: PROVINCE_LAYER_TOKENS.labelBg,
+            backgroundColor:
+              hoveredProvinceId === feature.properties.id
+                ? "rgba(18, 32, 48, 0.92)"
+                : PROVINCE_LAYER_TOKENS.labelBg,
             color: PROVINCE_LAYER_TOKENS.labelText,
           }}
         >

@@ -3,7 +3,7 @@ import type { GeoFeature } from "../geoTypes";
 import { focusFeatureOnMap, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
 import { useMapStore } from "../mapStore";
 import { MAP_FIT_PADDING_CLOSED, PROVINCE_LAYER_TOKENS } from "../mapLayout.js";
-import { loadLocalProvinceBoundaries, loadProvinceBoundaries } from "../provinceBoundaries";
+import type { ProvinceHoverState } from "../provinceHoverState";
 
 const NORMAL_STYLE = {
   strokeColor: PROVINCE_LAYER_TOKENS.stroke,
@@ -15,7 +15,7 @@ const NORMAL_STYLE = {
   zIndex: 60,
 };
 
-const HOVER_STYLE = {
+const ACTIVE_STYLE = {
   strokeColor: PROVINCE_LAYER_TOKENS.hoverStroke,
   strokeWeight: 3.2,
   strokeOpacity: 1,
@@ -25,22 +25,30 @@ const HOVER_STYLE = {
   zIndex: 70,
 };
 
-export function ProvinceLayer({ map }: { map: any }) {
+export function ProvinceLayer({
+  map,
+  features,
+  hoveredProvinceId,
+  onProvinceHoverChange,
+}: {
+  map: any;
+  features: GeoFeature[];
+  hoveredProvinceId: string | null;
+  onProvinceHoverChange: (next: ProvinceHoverState | null) => void;
+}) {
   const polygonsRef = useRef<any[]>([]);
   const outlinesRef = useRef<any[]>([]);
-  const tooltipRef = useRef<any>(null);
+  const polygonMapRef = useRef(new Map<string, any>());
   const enterProvince = useMapStore((s) => s.enterProvince);
 
   const handleClick = useCallback(
     (feature: GeoFeature) => {
-      if (tooltipRef.current) {
-        tooltipRef.current.hide();
-      }
+      onProvinceHoverChange(null);
       const { id, name } = feature.properties;
       enterProvince(id, name);
       focusFeatureOnMap(map, feature.geometry);
     },
-    [map, enterProvince],
+    [map, enterProvince, onProvinceHoverChange],
   );
 
   const clearLayers = useCallback(() => {
@@ -52,6 +60,7 @@ export function ProvinceLayer({ map }: { map: any }) {
       p.setMap(null);
     });
     polygonsRef.current = [];
+    polygonMapRef.current.clear();
 
     outlinesRef.current.forEach((outline) => {
       outline.setMap(null);
@@ -64,7 +73,6 @@ export function ProvinceLayer({ map }: { map: any }) {
       features: GeoFeature[],
       options: {
         fitView: boolean;
-        showBoundary: boolean;
       },
     ) => {
       const AMap = window.AMap;
@@ -81,57 +89,52 @@ export function ProvinceLayer({ map }: { map: any }) {
 
         const polygon = new AMap.Polygon({
           ...NORMAL_STYLE,
-          strokeOpacity: options.showBoundary ? NORMAL_STYLE.strokeOpacity : 0,
-          fillOpacity: options.showBoundary ? NORMAL_STYLE.fillOpacity : 0.001,
           path: paths,
           extData: feature.properties,
         });
 
         polygon.on("click", () => handleClick(feature));
         polygon.on("mouseover", (e: any) => {
-          polygon.setOptions({
-            ...HOVER_STYLE,
-            strokeOpacity: options.showBoundary ? HOVER_STYLE.strokeOpacity : 0,
-            fillOpacity: options.showBoundary ? HOVER_STYLE.fillOpacity : 0.05,
+          const pixel = map.lngLatToContainer(e.lnglat);
+          onProvinceHoverChange({
+            provinceId: feature.properties.id,
+            provinceName: feature.properties.name,
+            x: typeof pixel?.getX === "function" ? pixel.getX() : pixel?.x,
+            y: typeof pixel?.getY === "function" ? pixel.getY() : pixel?.y,
           });
-          if (tooltipRef.current) {
-            tooltipRef.current.setText(feature.properties.name);
-            tooltipRef.current.setPosition(e.lnglat);
-            tooltipRef.current.show();
-          }
         });
         polygon.on("mousemove", (e: any) => {
-          if (tooltipRef.current) {
-            tooltipRef.current.setPosition(e.lnglat);
-          }
+          const pixel = map.lngLatToContainer(e.lnglat);
+          onProvinceHoverChange({
+            provinceId: feature.properties.id,
+            provinceName: feature.properties.name,
+            x: typeof pixel?.getX === "function" ? pixel.getX() : pixel?.x,
+            y: typeof pixel?.getY === "function" ? pixel.getY() : pixel?.y,
+          });
         });
         polygon.on("mouseout", () => {
-          polygon.setOptions(NORMAL_STYLE);
-          if (tooltipRef.current) {
-            tooltipRef.current.hide();
-          }
+          onProvinceHoverChange(null);
         });
 
         polygons.push(polygon);
+        polygonMapRef.current.set(feature.properties.id, polygon);
 
-        if (options.showBoundary) {
-          const outlineSets = Array.isArray(paths[0][0][0]) ? (paths as [number, number][][][]) : [paths as [number, number][][]];
-          outlineSets.forEach((polygonRings) => {
-            polygonRings.forEach((ring) => {
-              const outline = new AMap.Polyline({
-                path: ring,
-                strokeColor: PROVINCE_LAYER_TOKENS.stroke,
-                strokeOpacity: 0.86,
-                strokeWeight: 1.8,
-                strokeStyle: "solid",
-                lineJoin: "round",
-                lineCap: "round",
-                zIndex: 95,
-              });
-              outlines.push(outline);
+        const outlineSets = Array.isArray(paths[0][0][0]) ? (paths as [number, number][][][]) : [paths as [number, number][][]];
+        outlineSets.forEach((polygonRings) => {
+          polygonRings.forEach((ring) => {
+            const outline = new AMap.Polyline({
+              path: ring,
+              strokeColor: PROVINCE_LAYER_TOKENS.stroke,
+              strokeOpacity: 0.86,
+              strokeWeight: 1.8,
+              strokeStyle: "solid",
+              lineJoin: "round",
+              lineCap: "round",
+              zIndex: 95,
             });
+            outlines.push(outline);
           });
-        }
+        });
       });
 
       polygonsRef.current = polygons;
@@ -150,52 +153,21 @@ export function ProvinceLayer({ map }: { map: any }) {
   useEffect(() => {
     if (!map) return;
 
-    let cancelled = false;
-    const AMap = window.AMap;
-
-    if (!tooltipRef.current) {
-      tooltipRef.current = new AMap.Text({
-        text: "",
-        anchor: "bottom-center",
-        offset: new AMap.Pixel(0, -10),
-        style: {
-          "background-color": "rgba(15, 23, 42, 0.92)",
-          "color": "#fff",
-          "border": `1px solid ${PROVINCE_LAYER_TOKENS.labelBorder}`,
-          "border-radius": "9999px",
-          "padding": "6px 10px",
-          "font-size": "12px",
-          "font-weight": "600",
-          "box-shadow": "0 8px 18px rgba(0,0,0,0.35)",
-          "pointer-events": "none",
-        },
-        visible: false,
-        zIndex: 100,
-      });
-      tooltipRef.current.setMap(map);
-    }
-
-    loadLocalProvinceBoundaries().then((features) => {
-      if (!cancelled) {
-        renderFeatures(features, { fitView: true, showBoundary: false });
-      }
-    });
-
-    loadProvinceBoundaries().then((features) => {
-      if (!cancelled) {
-        renderFeatures(features, { fitView: false, showBoundary: true });
-      }
-    });
+    renderFeatures(features, { fitView: true });
 
     return () => {
-      cancelled = true;
       clearLayers();
-      if (tooltipRef.current) {
-        tooltipRef.current.setMap(null);
-        tooltipRef.current = null;
-      }
+      onProvinceHoverChange(null);
     };
-  }, [map, clearLayers, renderFeatures]);
+  }, [map, clearLayers, renderFeatures, features, onProvinceHoverChange]);
+
+  useEffect(() => {
+    polygonMapRef.current.forEach((polygon, id) => {
+      polygon.setOptions(
+        id === hoveredProvinceId ? ACTIVE_STYLE : NORMAL_STYLE,
+      );
+    });
+  }, [hoveredProvinceId]);
 
   return null;
 }

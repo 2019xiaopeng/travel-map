@@ -5,6 +5,10 @@ import {
   normalizeProvinceBoundaryEnvelope,
   shouldUseBoundaryCache,
 } from "../src/features/map/provinceBoundarySource.ts";
+import {
+  clearProvinceHover,
+  nextProvinceHoverState,
+} from "../src/features/map/provinceHoverState.ts";
 
 test("normalizeProvinceBoundaryEnvelope rewrites 2-digit ids to 6-digit adcodes", () => {
   const normalized = normalizeProvinceBoundaryEnvelope([
@@ -32,5 +36,29 @@ test("shouldUseBoundaryCache accepts only matching cache version", () => {
       features: [],
     } as any),
     true,
+  );
+});
+
+test("nextProvinceHoverState stores hovered province and pixel position", () => {
+  const state = nextProvinceHoverState(null, {
+    provinceId: "330000",
+    provinceName: "浙江",
+    x: 240,
+    y: 120,
+  });
+
+  assert.equal(state?.provinceId, "330000");
+  assert.equal(state?.x, 240);
+});
+
+test("clearProvinceHover always removes tooltip state", () => {
+  assert.equal(
+    clearProvinceHover({
+      provinceId: "330000",
+      provinceName: "浙江",
+      x: 1,
+      y: 2,
+    }),
+    null,
   );
 });

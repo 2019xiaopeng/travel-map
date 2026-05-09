@@ -126,7 +126,12 @@ async function fetchProvinceBoundariesFromAmap(
             extensions: "all",
           });
 
-          districtSearch.search(seed.properties.name, (status: string, result: any) => {
+          const timeoutId = window.setTimeout(() => {
+            resolve(seed);
+          }, 4000);
+
+          districtSearch.search(seed.properties.id, (status: string, result: any) => {
+            window.clearTimeout(timeoutId);
             if (status !== "complete") {
               resolve(seed);
               return;
@@ -152,27 +157,36 @@ export async function loadCountryProvinceBoundaries() {
   if (provinceBoundarySourcePromise) return provinceBoundarySourcePromise;
 
   provinceBoundarySourcePromise = (async () => {
-    const cached = await readProvinceBoundaryCache();
-    if (shouldUseBoundaryCache(cached)) {
+    try {
+      const cached = await readProvinceBoundaryCache().catch(() => null);
+      if (shouldUseBoundaryCache(cached)) {
+        return {
+          status: "ready" as const,
+          source: "cache" as const,
+          features: normalizeProvinceBoundaryEnvelope(cached.features),
+        };
+      }
+
+      const localGeo = await loadGeoJson("china-provinces.json");
+      const normalizedSeed = normalizeProvinceBoundaryEnvelope(localGeo.features);
+      const features = await fetchProvinceBoundariesFromAmap(normalizedSeed);
+      const normalizedFeatures = normalizeProvinceBoundaryEnvelope(features);
+
+      void writeProvinceBoundaryCache(
+        createBoundaryCachePayload(normalizedFeatures, "amap"),
+      ).catch((error) => {
+        console.warn("Province boundary cache write failed:", error);
+      });
+
       return {
         status: "ready" as const,
-        source: "cache" as const,
-        features: normalizeProvinceBoundaryEnvelope(cached.features),
+        source: "amap" as const,
+        features: normalizedFeatures,
       };
+    } catch (error) {
+      provinceBoundarySourcePromise = null;
+      throw error;
     }
-
-    const localGeo = await loadGeoJson("china-provinces.json");
-    const normalizedSeed = normalizeProvinceBoundaryEnvelope(localGeo.features);
-    const features = await fetchProvinceBoundariesFromAmap(normalizedSeed);
-    await writeProvinceBoundaryCache(
-      createBoundaryCachePayload(features, "amap"),
-    );
-
-    return {
-      status: "ready" as const,
-      source: "amap" as const,
-      features: normalizeProvinceBoundaryEnvelope(features),
-    };
   })();
 
   return provinceBoundarySourcePromise;

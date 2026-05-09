@@ -7,6 +7,16 @@ import { PoiLayer } from "./layers/PoiLayer";
 import { BreadCrumbOverlay } from "./BreadCrumbOverlay";
 import { PoiAddModal } from "./PoiAddModal";
 import { ProvinceTagOverlay } from "./ProvinceTagOverlay";
+import {
+  ProvinceHoverOverlay,
+} from "./ProvinceHoverOverlay";
+import type { GeoFeature } from "./geoTypes";
+import { loadCountryProvinceBoundaries } from "./provinceBoundarySource";
+import {
+  clearProvinceHover,
+  nextProvinceHoverState,
+  type ProvinceHoverState,
+} from "./provinceHoverState";
 
 export function MapView() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -14,6 +24,13 @@ export function MapView() {
   const [map, setMap] = useState<any>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [boundaryWarning, setBoundaryWarning] = useState<string | null>(null);
+  const [provinceBoundaryStatus, setProvinceBoundaryStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [provinceFeatures, setProvinceFeatures] = useState<GeoFeature[]>([]);
+  const [provinceHover, setProvinceHover] = useState<ProvinceHoverState | null>(
+    null,
+  );
   const level = useMapStore((s) => s.level);
   const provinceId = useMapStore((s) => s.provinceId);
   const cityId = useMapStore((s) => s.cityId);
@@ -77,12 +94,43 @@ export function MapView() {
   useEffect(() => {
     if (level === "country") {
       setBoundaryWarning(null);
+      setProvinceHover(null);
     }
   }, [level]);
 
+  useEffect(() => {
+    if (!map || level !== "country") return;
+
+    let cancelled = false;
+    setProvinceBoundaryStatus("loading");
+
+    loadCountryProvinceBoundaries()
+      .then((result) => {
+        if (cancelled) return;
+        setProvinceFeatures(result.features);
+        setProvinceBoundaryStatus("ready");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Province boundary load error:", err);
+        setProvinceBoundaryStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+      setProvinceHover(null);
+    };
+  }, [map, level]);
+
   return (
     <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full" />
+      <div
+        ref={containerRef}
+        className="h-full w-full"
+        onMouseLeave={() => {
+          setProvinceHover((previous) => clearProvinceHover(previous));
+        }}
+      />
 
       {loadError && (
         <div className="absolute left-4 top-14 z-30 rounded-md border border-amber-500/40 bg-black/70 px-3 py-2 text-xs text-amber-300 backdrop-blur">
@@ -96,9 +144,40 @@ export function MapView() {
         </div>
       )}
 
-      {level === "country" && map && <ProvinceLayer map={map} />}
+      {level === "country" && provinceBoundaryStatus === "loading" && (
+        <div className="absolute left-4 top-28 z-30 rounded-md border border-white/10 bg-black/70 px-3 py-2 text-xs text-neutral-200 backdrop-blur">
+          正在加载精细省界...
+        </div>
+      )}
 
-      {level === "country" && map && <ProvinceTagOverlay map={map} />}
+      {level === "country" && provinceBoundaryStatus === "error" && (
+        <div className="absolute left-4 top-28 z-30 rounded-md border border-amber-500/40 bg-black/70 px-3 py-2 text-xs text-amber-200 backdrop-blur">
+          省界加载失败，请稍后重试。
+        </div>
+      )}
+
+      {level === "country" && map && provinceBoundaryStatus === "ready" && (
+        <ProvinceLayer
+          map={map}
+          features={provinceFeatures}
+          hoveredProvinceId={provinceHover?.provinceId ?? null}
+          onProvinceHoverChange={(next) =>
+            setProvinceHover((previous) =>
+              next ? nextProvinceHoverState(previous, next) : clearProvinceHover(previous),
+            )
+          }
+        />
+      )}
+
+      {level === "country" && map && provinceBoundaryStatus === "ready" && (
+        <ProvinceTagOverlay
+          map={map}
+          features={provinceFeatures}
+          hoveredProvinceId={provinceHover?.provinceId ?? null}
+        />
+      )}
+
+      {level === "country" && <ProvinceHoverOverlay hover={provinceHover} />}
 
       {(level === "province" || level === "city") && map && provinceId && (
         <CityLayer

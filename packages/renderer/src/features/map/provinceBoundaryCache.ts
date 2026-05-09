@@ -34,7 +34,7 @@ export function isBoundaryCachePayload(
 }
 
 export async function readProvinceBoundaryCache() {
-  if (window.travelMap.cache?.readProvinceBoundaries) {
+  if (window.travelMap?.cache?.readProvinceBoundaries) {
     const result = await window.travelMap.cache.readProvinceBoundaries();
     return isBoundaryCachePayload(result) ? result : null;
   }
@@ -51,7 +51,7 @@ export async function readProvinceBoundaryCache() {
 }
 
 export async function writeProvinceBoundaryCache(payload: BoundaryCachePayload) {
-  if (window.travelMap.cache?.writeProvinceBoundaries) {
+  if (window.travelMap?.cache?.writeProvinceBoundaries) {
     return window.travelMap.cache.writeProvinceBoundaries(payload);
   }
 
