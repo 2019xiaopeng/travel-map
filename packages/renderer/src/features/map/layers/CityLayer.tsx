@@ -23,6 +23,35 @@ interface RawMasterFeature {
   };
 }
 
+interface RawTopologyTransform {
+  scale: [number, number];
+  translate: [number, number];
+}
+
+interface RawTopologyGeometry {
+  type: "Polygon" | "MultiPolygon";
+  arcs: number[][] | number[][][];
+  properties?: {
+    name?: string;
+    fullname?: string;
+    code?: string | number;
+    adcode?: string | number;
+    center?: [number, number] | number[];
+  };
+}
+
+interface RawTopologyCollection {
+  type: "GeometryCollection";
+  geometries?: RawTopologyGeometry[];
+}
+
+interface RawTopology {
+  type: "Topology";
+  transform?: RawTopologyTransform;
+  arcs?: number[][][];
+  objects?: Record<string, RawTopologyCollection>;
+}
+
 function normalizeProvinceAdcode(provinceId: string): string {
   return provinceId.length === 2 ? `${provinceId}0000` : provinceId;
 }
@@ -71,6 +100,98 @@ function toGeoFeature(feature: RawMasterFeature): GeoFeature | null {
   };
 }
 
+function decodeTopologyArc(
+  topology: RawTopology,
+  arcIndex: number,
+): [number, number][] {
+  const arcs = topology.arcs ?? [];
+  const normalizedIndex = arcIndex >= 0 ? arcIndex : ~arcIndex;
+  const arc = arcs[normalizedIndex];
+  if (!arc) return [];
+
+  let x = 0;
+  let y = 0;
+  const scale = topology.transform?.scale ?? [1, 1];
+  const translate = topology.transform?.translate ?? [0, 0];
+  const points = arc.map(([dx, dy]) => {
+    x += dx;
+    y += dy;
+    return [
+      translate[0] + x * scale[0],
+      translate[1] + y * scale[1],
+    ] as [number, number];
+  });
+
+  return arcIndex >= 0 ? points : [...points].reverse();
+}
+
+function decodeTopologyRing(
+  topology: RawTopology,
+  ring: number[],
+): [number, number][] {
+  return ring.flatMap((arcIndex, index) => {
+    const points = decodeTopologyArc(topology, arcIndex);
+    return index === 0 ? points : points.slice(1);
+  });
+}
+
+function toGeoGeometryFromTopology(
+  topology: RawTopology,
+  geometry: RawTopologyGeometry,
+): GeoFeature["geometry"] | null {
+  if (geometry.type === "Polygon") {
+    return {
+      type: "Polygon",
+      coordinates: (geometry.arcs as number[][]).map((ring) =>
+        decodeTopologyRing(topology, ring),
+      ),
+    };
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return {
+      type: "MultiPolygon",
+      coordinates: (geometry.arcs as number[][][]).map((polygon) =>
+        polygon.map((ring) => decodeTopologyRing(topology, ring)),
+      ),
+    };
+  }
+
+  return null;
+}
+
+function topologyToGeoFeatures(topology: RawTopology): GeoFeature[] {
+  const collection = Object.values(topology.objects ?? {}).find(
+    (value): value is RawTopologyCollection =>
+      value?.type === "GeometryCollection" && Array.isArray(value.geometries),
+  );
+  if (!collection?.geometries) return [];
+
+  return collection.geometries
+    .map((geometry): GeoFeature | null => {
+      const geoGeometry = toGeoGeometryFromTopology(topology, geometry);
+      if (!geoGeometry) return null;
+
+      const id = toAdcode(geometry.properties?.code ?? geometry.properties?.adcode);
+      if (!id) return null;
+
+      const name = (geometry.properties?.name ?? id).toString();
+      const center = toCenter(geometry.properties?.center);
+
+      return {
+        type: "Feature",
+        properties: {
+          id,
+          name,
+          fullname: geometry.properties?.fullname,
+          center: center ?? featureCenter(geoGeometry),
+        },
+        geometry: geoGeometry,
+      } satisfies GeoFeature;
+    })
+    .filter((item): item is GeoFeature => item !== null);
+}
+
 export function hasRealCityBoundaryData(features: GeoFeature[]) {
   return features.length > 0;
 }
@@ -112,10 +233,15 @@ async function loadProvinceCities(provinceId: string): Promise<GeoFeature[]> {
   try {
     const response = await fetch(buildProvinceBoundaryUrl(provinceAdcode));
     if (response.ok) {
-      const raw = (await response.json()) as { features?: RawMasterFeature[] };
-      const features = (raw.features ?? [])
-        .map(toGeoFeature)
-        .filter((item): item is GeoFeature => item !== null);
+      const raw = (await response.json()) as
+        | { features?: RawMasterFeature[] }
+        | RawTopology;
+      const features =
+        raw && (raw as RawTopology).type === "Topology"
+          ? topologyToGeoFeatures(raw as RawTopology)
+          : (((raw as { features?: RawMasterFeature[] }).features ?? [])
+              .map(toGeoFeature)
+              .filter((item): item is GeoFeature => item !== null));
 
       if (hasRealCityBoundaryData(features)) {
         return features;

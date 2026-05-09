@@ -113,6 +113,7 @@ export function ProvinceTagOverlay({
               name: feature.properties.name,
             });
             focusProvinceOnMap(map, {
+              provinceId: feature.properties.id,
               geometry: feature.geometry,
               visualCenter:
                 feature.properties.visualCenter ?? feature.properties.center,

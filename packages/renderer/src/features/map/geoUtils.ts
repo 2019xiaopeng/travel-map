@@ -111,6 +111,7 @@ export function focusFeatureOnMap(
 }
 
 export interface FocusProvinceInput {
+  provinceId: string;
   geometry: {
     type: "Polygon" | "MultiPolygon";
     coordinates: number[][][] | number[][][][];
@@ -125,6 +126,7 @@ export function focusProvinceOnMap(
 ) {
   const size = map.getSize?.() ?? { width: 1280, height: 720 };
   const target = getProvinceCameraTarget({
+    provinceId: input.provinceId,
     bounds: input.bounds,
     visualCenter: input.visualCenter,
     viewport: {
