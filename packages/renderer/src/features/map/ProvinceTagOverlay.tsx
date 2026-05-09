@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { GeoFeature } from "./geoTypes";
-import { focusFeatureOnMap } from "./geoUtils";
+import { focusProvinceOnMap } from "./geoUtils";
 import { useMapStore } from "./mapStore";
 import { PROVINCE_LAYER_TOKENS } from "./mapLayout.js";
+import { shouldAlwaysShowProvinceLabel } from "./provinceBoundaryDataset.ts";
 
 interface ProvinceTagOverlayProps {
   map: any;
@@ -25,7 +26,8 @@ function projectProvinceTags(map: any, features: GeoFeature[]): ProvinceTag[] {
 
   const projected = features
     .map((feature) => {
-      const pixel = map.lngLatToContainer?.(feature.properties.center);
+      const anchor = feature.properties.labelAnchor ?? feature.properties.center;
+      const pixel = map.lngLatToContainer?.(anchor);
       const x = typeof pixel?.getX === "function" ? pixel.getX() : pixel?.x;
       const y = typeof pixel?.getY === "function" ? pixel.getY() : pixel?.y;
       if (typeof x !== "number" || typeof y !== "number") return null;
@@ -62,7 +64,7 @@ export function ProvinceTagOverlay({
   features,
   hoveredProvinceId,
 }: ProvinceTagOverlayProps) {
-  const enterProvince = useMapStore((s) => s.enterProvince);
+  const openProvinceExperience = useMapStore((s) => s.openProvinceExperience);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -85,9 +87,18 @@ export function ProvinceTagOverlay({
 
   const tags = useMemo(() => {
     const zoom = map?.getZoom?.() ?? 4.5;
-    const visibleFeatures = features.filter(
-      (feature) => zoom >= 4.6 || feature.properties.name.length <= 2,
-    );
+    const visibleFeatures = features
+      .filter(
+        (feature) =>
+          shouldAlwaysShowProvinceLabel(feature.properties.id) ||
+          zoom >= 4.8 ||
+          feature.properties.name.length <= 2,
+      )
+      .sort((left, right) => {
+        const leftPinned = shouldAlwaysShowProvinceLabel(left.properties.id) ? 1 : 0;
+        const rightPinned = shouldAlwaysShowProvinceLabel(right.properties.id) ? 1 : 0;
+        return rightPinned - leftPinned;
+      });
     return projectProvinceTags(map, visibleFeatures);
   }, [map, features, version]);
 
@@ -97,8 +108,17 @@ export function ProvinceTagOverlay({
         <button
           key={feature.properties.id}
           onClick={() => {
-            enterProvince(feature.properties.id, feature.properties.name);
-            focusFeatureOnMap(map, feature.geometry);
+            openProvinceExperience({
+              id: feature.properties.id,
+              name: feature.properties.name,
+            });
+            focusProvinceOnMap(map, {
+              geometry: feature.geometry,
+              visualCenter:
+                feature.properties.visualCenter ?? feature.properties.center,
+              bounds:
+                feature.properties.bounds!,
+            });
           }}
           className="
             pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full

@@ -77,7 +77,7 @@ export function Drawer({ open, onToggle }: DrawerProps) {
   if (!showShell) return null;
 
   return (
-    <div className="absolute top-0 right-0 bottom-0 z-40">
+    <div className="absolute top-0 right-0 bottom-0 z-40" data-drawer-shell="true">
       <button
         onMouseDown={handleToggleMouseDown}
         onClick={handleToggleClick}

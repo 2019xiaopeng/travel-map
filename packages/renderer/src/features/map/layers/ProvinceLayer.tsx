@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { GeoFeature } from "../geoTypes";
-import { focusFeatureOnMap, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
+import { focusProvinceOnMap, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
 import { useMapStore } from "../mapStore";
 import { MAP_FIT_PADDING_CLOSED, PROVINCE_LAYER_TOKENS } from "../mapLayout.js";
 import type { ProvinceHoverState } from "../provinceHoverState";
@@ -39,16 +39,29 @@ export function ProvinceLayer({
   const polygonsRef = useRef<any[]>([]);
   const outlinesRef = useRef<any[]>([]);
   const polygonMapRef = useRef(new Map<string, any>());
-  const enterProvince = useMapStore((s) => s.enterProvince);
+  const openProvinceExperience = useMapStore((s) => s.openProvinceExperience);
 
   const handleClick = useCallback(
     (feature: GeoFeature) => {
       onProvinceHoverChange(null);
-      const { id, name } = feature.properties;
-      enterProvince(id, name);
-      focusFeatureOnMap(map, feature.geometry);
+      openProvinceExperience({
+        id: feature.properties.id,
+        name: feature.properties.name,
+      });
+      focusProvinceOnMap(map, {
+        geometry: feature.geometry,
+        visualCenter:
+          feature.properties.visualCenter ?? feature.properties.center,
+        bounds:
+          feature.properties.bounds ?? {
+            minLng: feature.properties.center[0] - 1,
+            maxLng: feature.properties.center[0] + 1,
+            minLat: feature.properties.center[1] - 1,
+            maxLat: feature.properties.center[1] + 1,
+          },
+      });
     },
-    [map, enterProvince, onProvinceHoverChange],
+    [map, openProvinceExperience, onProvinceHoverChange],
   );
 
   const clearLayers = useCallback(() => {

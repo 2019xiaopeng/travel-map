@@ -8,6 +8,7 @@ import { ToastViewport } from "./ui/ToastViewport";
 export default function App() {
   const drawerOpen = useMapStore((s) => s.drawerOpen);
   const setDrawerOpen = useMapStore((s) => s.setDrawerOpen);
+  const level = useMapStore((s) => s.level);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -19,6 +20,20 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [setDrawerOpen]);
+
+  useEffect(() => {
+    if (level !== "province" || !drawerOpen) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      const shell = document.querySelector("[data-drawer-shell='true']");
+      if (!shell) {
+        console.warn("Drawer shell missing after province entry; forcing open state");
+        setDrawerOpen(true);
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [drawerOpen, level, setDrawerOpen]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[var(--color-bg)]">
