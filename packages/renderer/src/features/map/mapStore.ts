@@ -15,6 +15,7 @@ interface MapState {
   poiDraft: { lng: number; lat: number; gcj02_lng: number; gcj02_lat: number } | null;
 
   enterProvince: (id: string, name: string) => void;
+  openProvinceExperience: (payload: { id: string; name: string }) => void;
   enterCity: (id: string, name: string) => void;
   backToCountry: () => void;
   backToProvince: () => void;
@@ -38,6 +39,20 @@ export const useMapStore = create<MapState>((set) => ({
   selectedTripId: null,
   addingPoi: false,
   poiDraft: null,
+
+  openProvinceExperience: ({ id, name }) =>
+    set({
+      level: "province",
+      provinceId: id,
+      provinceName: name,
+      cityId: null,
+      cityName: null,
+      drawerOpen: true,
+      selectedPoiId: null,
+      selectedTripId: null,
+      addingPoi: false,
+      poiDraft: null,
+    }),
 
   enterProvince: (id, name) =>
     set({

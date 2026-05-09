@@ -1,5 +1,6 @@
 import type { GeoCollection } from "./geoTypes";
 import { MAP_FIT_PADDING_CLOSED, MAP_FIT_PADDING_OPEN } from "./mapLayout.js";
+import { getProvinceCameraTarget, type ProvinceCameraBounds } from "./provinceCamera.ts";
 
 const geoCache = new Map<string, Promise<GeoCollection>>();
 
@@ -107,4 +108,30 @@ export function focusFeatureOnMap(
   });
   map.setFitView([focusPolygon], false, padding);
   focusPolygon.setMap(null);
+}
+
+export interface FocusProvinceInput {
+  geometry: {
+    type: "Polygon" | "MultiPolygon";
+    coordinates: number[][][] | number[][][][];
+  };
+  visualCenter: [number, number];
+  bounds: ProvinceCameraBounds;
+}
+
+export function focusProvinceOnMap(
+  map: any,
+  input: FocusProvinceInput,
+) {
+  const size = map.getSize?.() ?? { width: 1280, height: 720 };
+  const target = getProvinceCameraTarget({
+    bounds: input.bounds,
+    visualCenter: input.visualCenter,
+    viewport: {
+      width: typeof size.width === "number" ? size.width : 1280,
+      height: typeof size.height === "number" ? size.height : 720,
+    },
+  });
+
+  map.setZoomAndCenter(target.zoom, target.center, false);
 }
