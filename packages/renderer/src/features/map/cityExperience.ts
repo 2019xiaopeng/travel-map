@@ -1,4 +1,4 @@
-import { focusFeatureOnMap } from "./geoUtils.ts";
+import { focusCityOnMap } from "./geoUtils.ts";
 import { useMapStore } from "./mapStore.ts";
 
 export function openCityExperience(
@@ -22,10 +22,9 @@ export function openCityExperience(
     cityName: input.cityName,
   });
 
-  if (input.geometry) {
-    focusFeatureOnMap(map, input.geometry);
-    return;
-  }
-
-  map.setZoomAndCenter?.(9.2, input.center, false);
+  focusCityOnMap(map, {
+    geometry: input.geometry,
+    visualCenter: input.center,
+    drawerOpen: true,
+  });
 }

@@ -1,6 +1,7 @@
 import type { GeoCollection } from "./geoTypes";
 import { MAP_FIT_PADDING_CLOSED, MAP_FIT_PADDING_OPEN } from "./mapLayout.js";
 import { getProvinceCameraTarget, type ProvinceCameraBounds } from "./provinceCamera.ts";
+import { getCityCameraTarget } from "./cityCamera.ts";
 
 const geoCache = new Map<string, Promise<GeoCollection>>();
 
@@ -133,6 +134,52 @@ export function focusProvinceOnMap(
       width: typeof size.width === "number" ? size.width : 1280,
       height: typeof size.height === "number" ? size.height : 720,
     },
+  });
+
+  map.setZoomAndCenter(target.zoom, target.center, false);
+}
+
+export function focusCityOnMap(
+  map: any,
+  input: {
+    geometry?: {
+      type: "Polygon" | "MultiPolygon";
+      coordinates: number[][][] | number[][][][];
+    };
+    visualCenter: [number, number];
+    drawerOpen: boolean;
+  },
+) {
+  const size = map.getSize?.() ?? { width: 1280, height: 720 };
+  const viewport = {
+    width: typeof size.width === "number" ? size.width : 1280,
+    height: typeof size.height === "number" ? size.height : 720,
+  };
+
+  if (input.geometry) {
+    const target = getCityCameraTarget({
+      bounds: geometryBounds(input.geometry),
+      visualCenter: input.visualCenter,
+      viewport,
+      drawerOpen: input.drawerOpen,
+    });
+
+    map.setZoomAndCenter(target.zoom, target.center, false);
+    return;
+  }
+
+  const target = getCityCameraTarget({
+    bounds: {
+      minLng: input.visualCenter[0] - 0.35,
+      maxLng: input.visualCenter[0] + 0.35,
+      minLat: input.visualCenter[1] - 0.28,
+      maxLat: input.visualCenter[1] + 0.28,
+    },
+    visualCenter: input.visualCenter,
+    viewport,
+    drawerOpen: input.drawerOpen,
+    minZoom: 8.8,
+    maxZoom: 9.6,
   });
 
   map.setZoomAndCenter(target.zoom, target.center, false);

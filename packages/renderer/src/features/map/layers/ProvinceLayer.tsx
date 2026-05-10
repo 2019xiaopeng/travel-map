@@ -1,45 +1,56 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import type { GeoFeature } from "../geoTypes";
 import { focusProvinceOnMap, polygonCoordsToPaths, multiPolygonCoordsToPaths } from "../geoUtils";
 import { useMapStore } from "../mapStore";
 import { MAP_FIT_PADDING_CLOSED, PROVINCE_LAYER_TOKENS } from "../mapLayout.js";
 import type { ProvinceHoverState } from "../provinceHoverState";
-
-const NORMAL_STYLE = {
-  strokeColor: PROVINCE_LAYER_TOKENS.stroke,
-  strokeWeight: 2.2,
-  strokeOpacity: 0.92,
-  fillColor: PROVINCE_LAYER_TOKENS.fill,
-  fillOpacity: 0.035,
-  cursor: "pointer" as const,
-  zIndex: 60,
-};
-
-const ACTIVE_STYLE = {
-  strokeColor: PROVINCE_LAYER_TOKENS.hoverStroke,
-  strokeWeight: 3.2,
-  strokeOpacity: 1,
-  fillColor: PROVINCE_LAYER_TOKENS.hoverFill,
-  fillOpacity: 0.08,
-  cursor: "pointer" as const,
-  zIndex: 70,
-};
+import {
+  getProvinceLayerModeConfig,
+  type ProvinceLayerMode,
+} from "../provinceLayerMode.ts";
 
 export function ProvinceLayer({
   map,
   features,
   hoveredProvinceId,
   onProvinceHoverChange,
+  mode = "country",
 }: {
   map: any;
   features: GeoFeature[];
   hoveredProvinceId: string | null;
   onProvinceHoverChange: (next: ProvinceHoverState | null) => void;
+  mode?: ProvinceLayerMode;
 }) {
   const polygonsRef = useRef<any[]>([]);
   const outlinesRef = useRef<any[]>([]);
   const polygonMapRef = useRef(new Map<string, any>());
   const openProvinceExperience = useMapStore((s) => s.openProvinceExperience);
+  const modeConfig = getProvinceLayerModeConfig(mode);
+  const normalStyle = useMemo(
+    () => ({
+      strokeColor: PROVINCE_LAYER_TOKENS.stroke,
+      strokeWeight: modeConfig.strokeWeight,
+      strokeOpacity: 0.92,
+      fillColor: PROVINCE_LAYER_TOKENS.fill,
+      fillOpacity: modeConfig.fillOpacity,
+      cursor: "pointer" as const,
+      zIndex: modeConfig.zIndex,
+    }),
+    [modeConfig],
+  );
+  const activeStyle = useMemo(
+    () => ({
+      strokeColor: PROVINCE_LAYER_TOKENS.hoverStroke,
+      strokeWeight: modeConfig.activeStrokeWeight,
+      strokeOpacity: 1,
+      fillColor: PROVINCE_LAYER_TOKENS.hoverFill,
+      fillOpacity: modeConfig.activeFillOpacity,
+      cursor: "pointer" as const,
+      zIndex: modeConfig.zIndex + 10,
+    }),
+    [modeConfig],
+  );
 
   const handleClick = useCallback(
     (feature: GeoFeature) => {
@@ -102,7 +113,7 @@ export function ProvinceLayer({
             : multiPolygonCoordsToPaths(feature.geometry.coordinates as number[][][][]);
 
         const polygon = new AMap.Polygon({
-          ...NORMAL_STYLE,
+          ...normalStyle,
           path: paths,
           extData: feature.properties,
         });
@@ -140,11 +151,11 @@ export function ProvinceLayer({
               path: ring,
               strokeColor: PROVINCE_LAYER_TOKENS.stroke,
               strokeOpacity: 0.86,
-              strokeWeight: 1.8,
+              strokeWeight: modeConfig.outlineStrokeWeight,
               strokeStyle: "solid",
               lineJoin: "round",
               lineCap: "round",
-              zIndex: 95,
+              zIndex: modeConfig.outlineZIndex,
             });
             outlines.push(outline);
           });
@@ -161,27 +172,27 @@ export function ProvinceLayer({
         map.setFitView(polygons, false, MAP_FIT_PADDING_CLOSED);
       }
     },
-    [clearLayers, handleClick, map, onProvinceHoverChange],
+    [clearLayers, handleClick, map, modeConfig, normalStyle, onProvinceHoverChange],
   );
 
   useEffect(() => {
     if (!map) return;
 
-    renderFeatures(features, { fitView: true });
+    renderFeatures(features, { fitView: modeConfig.fitView });
 
     return () => {
       clearLayers();
       onProvinceHoverChange(null);
     };
-  }, [map, clearLayers, renderFeatures, features, onProvinceHoverChange]);
+  }, [map, clearLayers, renderFeatures, features, modeConfig.fitView, onProvinceHoverChange]);
 
   useEffect(() => {
     polygonMapRef.current.forEach((polygon, id) => {
       polygon.setOptions(
-        id === hoveredProvinceId ? ACTIVE_STYLE : NORMAL_STYLE,
+        id === hoveredProvinceId ? activeStyle : normalStyle,
       );
     });
-  }, [hoveredProvinceId]);
+  }, [activeStyle, hoveredProvinceId, normalStyle]);
 
   return null;
 }

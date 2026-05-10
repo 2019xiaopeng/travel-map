@@ -169,10 +169,26 @@ export function MapView() {
           features={provinceFeatures}
           hoveredProvinceId={provinceHover?.provinceId ?? null}
           onProvinceHoverChange={handleProvinceHoverChange}
+          mode="country"
         />
       )}
 
-      {level === "country" && <ProvinceHoverOverlay hover={provinceHover} />}
+      {(level === "province" || level === "city") &&
+        map &&
+        provinceBoundaryStatus === "ready" && (
+          <ProvinceLayer
+            map={map}
+            features={provinceFeatures}
+            hoveredProvinceId={provinceHover?.provinceId ?? null}
+            onProvinceHoverChange={handleProvinceHoverChange}
+            mode="overlay"
+          />
+        )}
+
+      {(level === "country" || level === "province" || level === "city") &&
+        provinceBoundaryStatus === "ready" && (
+          <ProvinceHoverOverlay hover={provinceHover} />
+        )}
 
       {(level === "province" || level === "city") && map && provinceId && (
         <CityLayer
