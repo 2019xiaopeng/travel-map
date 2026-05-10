@@ -317,6 +317,19 @@ export function setupIpc() {
     return { ok: true };
   });
 
+  ipcMain.handle(
+    "db:updateCityVisitState",
+    (event, payload: { cityId: string; visitState: "unrecorded" | "wishlist" | "visited" }) => {
+      assertSender(event);
+      const db = getDb();
+      db.prepare(`UPDATE City SET visit_state = ? WHERE city_id = ?`).run(
+        payload.visitState,
+        payload.cityId,
+      );
+      return { ok: true };
+    },
+  );
+
   ipcMain.handle("db:getPois", (event, payload: { cityId: string }) => {
     assertSender(event);
     const db = getDb();

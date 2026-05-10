@@ -34,6 +34,7 @@ interface Window {
       setTripInlineAssets: (payload: { tripId: string; assetIds: string[] }) => Promise<any>;
       updateCitySummary: (payload: { cityId: string; summary: string }) => Promise<void>;
       updateCityCover: (payload: { cityId: string; assetId: string }) => Promise<void>;
+      updateCityVisitState: (payload: { cityId: string; visitState: "unrecorded" | "wishlist" | "visited" }) => Promise<{ ok: true }>;
       getTags: (payload: { entityType: string; entityId: string }) => Promise<Array<{ name: string }>>;
       addTag: (payload: { entityType: string; entityId: string; name: string }) => Promise<any>;
       removeTag: (payload: { entityType: string; entityId: string; name: string }) => Promise<any>;

@@ -7,6 +7,7 @@ export interface City {
   city_id: string;
   province_id: string;
   name: string;
+  visit_state?: "unrecorded" | "wishlist" | "visited";
   summary?: string;
   cover_asset_id?: string;
   cover_path?: string;

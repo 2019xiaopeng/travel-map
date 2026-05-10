@@ -15,6 +15,13 @@ export const db = {
     return await window.travelMap.db.updateCityCover({ cityId, assetId });
   },
 
+  async updateCityVisitState(
+    cityId: string,
+    visitState: "unrecorded" | "wishlist" | "visited",
+  ) {
+    return await window.travelMap.db.updateCityVisitState({ cityId, visitState });
+  },
+
   async getTrips(cityId: string) {
     return await window.travelMap.db.getTrips({ cityId });
   },

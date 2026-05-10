@@ -3,6 +3,7 @@ import { app } from 'electron';
 import { join } from 'path';
 import { SCHEMA_V1 } from './schema';
 import fs from 'fs';
+import { ensureCityVisitStateColumn } from './cityVisitStateMigration';
 
 export class DBManager {
   private db: Database.Database;
@@ -29,6 +30,11 @@ export class DBManager {
     if (currentVersion < 1) {
       this.db.exec(SCHEMA_V1);
       this.db.pragma('user_version = 1');
+    }
+
+    if (currentVersion < 2) {
+      ensureCityVisitStateColumn(this.db);
+      this.db.pragma('user_version = 2');
     }
   }
 

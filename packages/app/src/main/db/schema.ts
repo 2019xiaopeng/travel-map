@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS City (
   city_id TEXT PRIMARY KEY,
   province_id TEXT REFERENCES Province(province_id),
   name TEXT NOT NULL,
+  visit_state TEXT NOT NULL DEFAULT 'unrecorded',
   summary TEXT,
   cover_asset_id TEXT
 );
