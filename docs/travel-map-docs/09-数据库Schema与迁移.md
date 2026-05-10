@@ -31,7 +31,7 @@
 - `route` (TEXT)：路线概览
 - `cost_total` (REAL)：总花费
 - `cover_asset_id` (TEXT, FK → Asset.asset_id)：旅行封面（可选）
-- `content` (TEXT)：正文（Markdown 存储；编辑器为 Milkdown WYSIWYG）
+- `content` (TEXT)：正文（Markdown 存储；当前以本地编辑与本地阅读闭环为主）
 - `created_at` (INTEGER)：Unix 时间戳
 - `updated_at` (INTEGER)：Unix 时间戳
 
@@ -56,7 +56,7 @@
 - `size` (INTEGER)：字节
 - `sha256` (TEXT)：UNIQUE（防重复导入/便于校验）
 - `local_path` (TEXT)：相对于 APP_DATA_DIR 的相对路径（按城市/旅行目录）✅
-- `remote_url` (TEXT)：R2 公网链接（同步后写入）✅
+- `remote_url` (TEXT)：预留字段；未来若恢复上云/对象存储再写入
 - `created_at` (INTEGER)
 
 ### 1.3 关联与拆分表
@@ -85,14 +85,14 @@
 
 ### 2.1 原因
 - 个人本地知识库：图片/附件占用大，软删会导致磁盘持续膨胀
-- 备份走 zip 全量：保留“历史版本”意义不大，且可通过 zip/云端恢复
+- 备份走 zip 全量：保留“历史版本”意义不大，且可通过 zip 本地恢复
 
 ### 2.2 规则
 1) 关联表（`Tag`、`CostBreakdown`、`Trip_POI`）：建议外键 `ON DELETE CASCADE`  
 2) 核心表（`Trip`、`POI`）：应用层直接硬删  
 3) **Asset 生命周期拦截（关键）**  
    - 从 SQLite 删除 Asset 记录前：应用层必须先判断引用计数（是否仍被 City/Trip/POI 引用）
-   - 若无引用：先删除本地文件（local_path）→（可选）删除 R2 对象 → 再 DELETE Asset 记录
+   - 若无引用：先删除本地文件（local_path）→ 再 DELETE Asset 记录
 
 ## 3. 迁移策略（Migration）
 
