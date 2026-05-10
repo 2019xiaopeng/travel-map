@@ -26,3 +26,17 @@ test("buildProvinceBoundaryUrl uses the dedicated Taiwan endpoint", () => {
     "https://geojson.cn/api/china/1.6.3/710000.topo.json",
   );
 });
+
+test("buildProvinceBoundaryUrl uses the dedicated Hong Kong endpoint", () => {
+  assert.equal(
+    buildProvinceBoundaryUrl("810000"),
+    "https://geojson.cn/api/china/1.6.3/810000.topo.json",
+  );
+});
+
+test("buildProvinceBoundaryUrl uses the dedicated Macau endpoint", () => {
+  assert.equal(
+    buildProvinceBoundaryUrl("820000"),
+    "https://geojson.cn/api/china/1.6.3/820000.topo.json",
+  );
+});
