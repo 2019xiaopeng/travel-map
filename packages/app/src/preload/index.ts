@@ -53,6 +53,7 @@ const api = {
     exportBackupZip: () => ipcRenderer.invoke("file:exportBackupZip"),
     importBackupZip: () => ipcRenderer.invoke("file:importBackupZip"),
     openLocal: (localPath: string) => ipcRenderer.invoke("file:openLocal", { localPath }),
+    readLocalText: (localPath: string) => ipcRenderer.invoke("file:readLocalText", { localPath }),
   },
   cache: {
     readProvinceBoundaries: () => ipcRenderer.invoke("cache:readProvinceBoundaries"),

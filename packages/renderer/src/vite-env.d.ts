@@ -45,6 +45,7 @@ interface Window {
       exportBackupZip: () => Promise<{ ok?: boolean; path?: string; canceled?: boolean; error?: string; warnings?: Array<{ type: string; asset_id?: string; message: string }> }>;
       importBackupZip: () => Promise<{ ok?: boolean; stagingPath?: string; needsRestart?: boolean; canceled?: boolean; error?: string; warnings?: Array<{ type: string; asset_id?: string; message: string }> }>;
       openLocal: (localPath: string) => Promise<{ ok?: boolean; error?: string }>;
+      readLocalText: (localPath: string) => Promise<{ ok: true; text: string } | { ok: false; error: string }>;
     };
     cache: {
       readProvinceBoundaries: () => Promise<any>;

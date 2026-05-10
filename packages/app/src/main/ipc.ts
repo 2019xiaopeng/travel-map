@@ -10,6 +10,7 @@ import { stageRestoreFromZip } from "./backupRestore";
 import { exportRestoreDiagnostic } from "./diagnostics/restoreDiagnostics.ts";
 import { resolveDiagnosticsRevealAbsolutePath } from "./diagnostics/diagnosticsPaths.ts";
 import { getCityAssets } from "./cityAssetsQuery";
+import { readLocalText } from "./readLocalText";
 
 export function setupIpc() {
   const assertSender = (event: Electron.IpcMainInvokeEvent) => {
@@ -752,6 +753,15 @@ export function setupIpc() {
     } catch (e: any) {
       return { error: e.message };
     }
+  });
+
+  ipcMain.handle("file:readLocalText", async (event, payload: { localPath: string }) => {
+    assertSender(event);
+    return await readLocalText({
+      userDataPath: app.getPath("userData"),
+      localPath: payload.localPath,
+      maxBytes: 1024 * 1024,
+    });
   });
 
   ipcMain.handle("cache:readProvinceBoundaries", async (event) => {
