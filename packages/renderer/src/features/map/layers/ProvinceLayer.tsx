@@ -28,7 +28,9 @@ export function ProvinceLayer({
   const hoverClearTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const hoveredProvinceIdRef = useRef<string | null>(null);
   const openProvinceExperience = useMapStore((s) => s.openProvinceExperience);
-  const modeConfig = getProvinceLayerModeConfig(mode);
+  // Keep layer config stable across hover updates; otherwise the render effect
+  // rebuilds all province polygons on every hover frame and causes flicker.
+  const modeConfig = useMemo(() => getProvinceLayerModeConfig(mode), [mode]);
   const normalStyle = useMemo(
     () => ({
       strokeColor: PROVINCE_LAYER_TOKENS.stroke,
