@@ -6,6 +6,7 @@ import {
   searchCityIndex,
   type CitySearchEntry,
 } from "./citySearchIndex.ts";
+import { getSearchBoxMotionState } from "./searchBoxMotion.ts";
 
 function HighlightText({
   text,
@@ -40,6 +41,7 @@ export function CitySearchBox({
   const [index, setIndex] = useState<Awaited<ReturnType<typeof loadCitySearchIndex>>>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const motion = getSearchBoxMotionState(open);
 
   useEffect(() => {
     if (!open) {
@@ -69,72 +71,72 @@ export function CitySearchBox({
 
   return (
     <div
-      className={`overflow-hidden transition-all duration-200 ease-out ${
-        open ? "w-72 opacity-100" : "w-0 opacity-0"
-      }`}
+      className={`overflow-hidden transition-[width,opacity] duration-200 ease-out ${motion.containerClass}`}
+      aria-hidden={!open}
     >
-      {open && (
-        <div className="relative">
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setActiveIndex(0);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowDown") {
-                event.preventDefault();
-                setActiveIndex((current) =>
-                  Math.min(current + 1, Math.max(results.length - 1, 0)),
-                );
-              }
-              if (event.key === "ArrowUp") {
-                event.preventDefault();
-                setActiveIndex((current) => Math.max(current - 1, 0));
-              }
-              if (event.key === "Enter" && results[activeIndex]) {
-                event.preventDefault();
-                onSelect(results[activeIndex]);
-              }
-            }}
-            placeholder="搜索全国城市"
-            className="w-full rounded-full border border-white/10 bg-black/45 px-4 py-2 text-sm text-white outline-none backdrop-blur-md placeholder:text-neutral-500"
-          />
+      <div className={`relative transition-all duration-200 ease-out ${motion.innerClass}`}>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActiveIndex(0);
+          }}
+          onKeyDown={(event) => {
+            if (!open) return;
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setActiveIndex((current) =>
+                Math.min(current + 1, Math.max(results.length - 1, 0)),
+              );
+            }
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setActiveIndex((current) => Math.max(current - 1, 0));
+            }
+            if (event.key === "Enter" && results[activeIndex]) {
+              event.preventDefault();
+              onSelect(results[activeIndex]);
+            }
+          }}
+          placeholder="搜索全国城市"
+          className="w-full rounded-full border border-white/10 bg-black/45 px-4 py-2 text-sm text-white outline-none backdrop-blur-md placeholder:text-neutral-500"
+        />
 
-          <div className="absolute left-0 top-full mt-2 w-full overflow-hidden rounded-2xl border border-white/10 bg-[rgba(8,16,24,0.94)] shadow-2xl">
-            {error ? (
-              <div className="px-4 py-3 text-sm text-amber-200">{error}</div>
-            ) : query.trim().length === 0 ? (
-              <div className="px-4 py-3 text-sm text-neutral-400">输入城市名开始搜索</div>
-            ) : results.length > 0 ? (
-              results.map((item, index) => (
-                <button
-                  key={item.cityId}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    onSelect(item);
-                  }}
-                  className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm ${
-                    index === activeIndex
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-200 hover:bg-white/5"
-                  }`}
-                >
-                  <span>
-                    <HighlightText text={item.cityName} query={query} />
-                  </span>
-                  <span className="text-xs text-neutral-400">
-                    <HighlightText text={item.provinceName} query={query} />
-                  </span>
-                </button>
-              ))
-            ) : (
-              <div className="px-4 py-3 text-sm text-neutral-400">未找到匹配城市</div>
-            )}
-          </div>
+        <div
+          className={`absolute left-0 top-full mt-2 w-full overflow-hidden rounded-2xl border border-white/10 bg-[rgba(8,16,24,0.94)] shadow-2xl transition-all duration-200 ease-out ${motion.panelClass}`}
+        >
+          {error ? (
+            <div className="px-4 py-3 text-sm text-amber-200">{error}</div>
+          ) : query.trim().length === 0 ? (
+            <div className="px-4 py-3 text-sm text-neutral-400">输入城市名开始搜索</div>
+          ) : results.length > 0 ? (
+            results.map((item, index) => (
+              <button
+                key={item.cityId}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  onSelect(item);
+                }}
+                className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm ${
+                  index === activeIndex
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-200 hover:bg-white/5"
+                }`}
+              >
+                <span>
+                  <HighlightText text={item.cityName} query={query} />
+                </span>
+                <span className="text-xs text-neutral-400">
+                  <HighlightText text={item.provinceName} query={query} />
+                </span>
+              </button>
+            ))
+          ) : (
+            <div className="px-4 py-3 text-sm text-neutral-400">未找到匹配城市</div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

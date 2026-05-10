@@ -25,6 +25,8 @@ export function ProvinceLayer({
   const polygonsRef = useRef<any[]>([]);
   const outlinesRef = useRef<any[]>([]);
   const polygonMapRef = useRef(new Map<string, any>());
+  const hoverClearTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const hoveredProvinceIdRef = useRef<string | null>(null);
   const openProvinceExperience = useMapStore((s) => s.openProvinceExperience);
   const modeConfig = getProvinceLayerModeConfig(mode);
   const normalStyle = useMemo(
@@ -54,6 +56,11 @@ export function ProvinceLayer({
 
   const handleClick = useCallback(
     (feature: GeoFeature) => {
+      if (hoverClearTimerRef.current !== null) {
+        window.clearTimeout(hoverClearTimerRef.current);
+        hoverClearTimerRef.current = null;
+      }
+      hoveredProvinceIdRef.current = null;
       onProvinceHoverChange(null);
       openProvinceExperience({
         id: feature.properties.id,
@@ -74,6 +81,42 @@ export function ProvinceLayer({
       });
     },
     [map, openProvinceExperience, onProvinceHoverChange],
+  );
+
+  const cancelPendingHoverClear = useCallback(() => {
+    if (hoverClearTimerRef.current !== null) {
+      window.clearTimeout(hoverClearTimerRef.current);
+      hoverClearTimerRef.current = null;
+    }
+  }, []);
+
+  const applyHover = useCallback(
+    (feature: GeoFeature, event: any) => {
+      cancelPendingHoverClear();
+      hoveredProvinceIdRef.current = feature.properties.id;
+      const pixel = map.lngLatToContainer(event.lnglat);
+      onProvinceHoverChange({
+        provinceId: feature.properties.id,
+        provinceName: feature.properties.name,
+        x: typeof pixel?.getX === "function" ? pixel.getX() : pixel?.x,
+        y: typeof pixel?.getY === "function" ? pixel.getY() : pixel?.y,
+      });
+    },
+    [cancelPendingHoverClear, map, onProvinceHoverChange],
+  );
+
+  const scheduleHoverClear = useCallback(
+    (provinceId: string) => {
+      cancelPendingHoverClear();
+      hoverClearTimerRef.current = window.setTimeout(() => {
+        if (hoveredProvinceIdRef.current === provinceId) {
+          hoveredProvinceIdRef.current = null;
+          onProvinceHoverChange(null);
+        }
+        hoverClearTimerRef.current = null;
+      }, modeConfig.hoverClearDelayMs);
+    },
+    [cancelPendingHoverClear, modeConfig.hoverClearDelayMs, onProvinceHoverChange],
   );
 
   const clearLayers = useCallback(() => {
@@ -119,26 +162,10 @@ export function ProvinceLayer({
         });
 
         polygon.on("click", () => handleClick(feature));
-        polygon.on("mouseover", (e: any) => {
-          const pixel = map.lngLatToContainer(e.lnglat);
-          onProvinceHoverChange({
-            provinceId: feature.properties.id,
-            provinceName: feature.properties.name,
-            x: typeof pixel?.getX === "function" ? pixel.getX() : pixel?.x,
-            y: typeof pixel?.getY === "function" ? pixel.getY() : pixel?.y,
-          });
-        });
-        polygon.on("mousemove", (e: any) => {
-          const pixel = map.lngLatToContainer(e.lnglat);
-          onProvinceHoverChange({
-            provinceId: feature.properties.id,
-            provinceName: feature.properties.name,
-            x: typeof pixel?.getX === "function" ? pixel.getX() : pixel?.x,
-            y: typeof pixel?.getY === "function" ? pixel.getY() : pixel?.y,
-          });
-        });
+        polygon.on("mouseover", (event: any) => applyHover(feature, event));
+        polygon.on("mousemove", (event: any) => applyHover(feature, event));
         polygon.on("mouseout", () => {
-          onProvinceHoverChange(null);
+          scheduleHoverClear(feature.properties.id);
         });
 
         polygons.push(polygon);
@@ -156,6 +183,7 @@ export function ProvinceLayer({
               lineJoin: "round",
               lineCap: "round",
               zIndex: modeConfig.outlineZIndex,
+              bubble: false,
             });
             outlines.push(outline);
           });
@@ -164,16 +192,28 @@ export function ProvinceLayer({
 
       polygonsRef.current = polygons;
       outlinesRef.current = outlines;
-      map.add(polygons);
       if (outlines.length > 0) {
         map.add(outlines);
       }
+      map.add(polygons);
       if (options.fitView) {
         map.setFitView(polygons, false, MAP_FIT_PADDING_CLOSED);
       }
     },
-    [clearLayers, handleClick, map, modeConfig, normalStyle, onProvinceHoverChange],
+    [
+      applyHover,
+      clearLayers,
+      handleClick,
+      map,
+      modeConfig,
+      normalStyle,
+      scheduleHoverClear,
+    ],
   );
+
+  useEffect(() => {
+    hoveredProvinceIdRef.current = hoveredProvinceId;
+  }, [hoveredProvinceId]);
 
   useEffect(() => {
     if (!map) return;
@@ -181,10 +221,20 @@ export function ProvinceLayer({
     renderFeatures(features, { fitView: modeConfig.fitView });
 
     return () => {
+      cancelPendingHoverClear();
+      hoveredProvinceIdRef.current = null;
       clearLayers();
       onProvinceHoverChange(null);
     };
-  }, [map, clearLayers, renderFeatures, features, modeConfig.fitView, onProvinceHoverChange]);
+  }, [
+    map,
+    cancelPendingHoverClear,
+    clearLayers,
+    renderFeatures,
+    features,
+    modeConfig.fitView,
+    onProvinceHoverChange,
+  ]);
 
   useEffect(() => {
     polygonMapRef.current.forEach((polygon, id) => {
