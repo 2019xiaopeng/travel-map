@@ -1,5 +1,8 @@
 import { DRAWER_WIDTH } from "./mapLayout.js";
-import type { ProvinceCameraBounds } from "./provinceCamera.ts";
+import {
+  getAnchoredCenterLng,
+  type ProvinceCameraBounds,
+} from "./provinceCamera.ts";
 
 export interface CityCameraInput {
   bounds: ProvinceCameraBounds;
@@ -34,14 +37,14 @@ export function getCityCameraTarget(input: CityCameraInput) {
     input.minZoom ?? 6.4,
     Math.min(Math.min(horizontalZoom, verticalZoom) + 0.18, input.maxZoom ?? 11.2),
   );
-  const drawerRatio = input.drawerOpen
-    ? DRAWER_WIDTH / Math.max(input.viewport.width, 1)
-    : 0;
-  const centerLngOffset = lngSpan * (0.18 + drawerRatio * 0.35);
-
   return {
     center: [
-      Number((input.visualCenter[0] - centerLngOffset).toFixed(6)),
+      getAnchoredCenterLng({
+        visualCenterLng: input.visualCenter[0],
+        lngSpan,
+        viewportWidth: input.viewport.width,
+        availableWidth,
+      }),
       input.visualCenter[1],
     ] as [number, number],
     zoom: Number(zoom.toFixed(2)),

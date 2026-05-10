@@ -11,7 +11,7 @@ test("getCityCameraTarget shifts the visual center left when the drawer is open"
     drawerOpen: true,
   });
 
-  assert.ok(target.center[0] < 120.2);
+  assert.ok(target.center[0] > 120.2);
 });
 
 test("getCityCameraTarget keeps drawer-closed targets closer to the original center", () => {
@@ -28,7 +28,7 @@ test("getCityCameraTarget keeps drawer-closed targets closer to the original cen
     drawerOpen: false,
   });
 
-  assert.ok(openTarget.center[0] < closedTarget.center[0]);
+  assert.ok(openTarget.center[0] > closedTarget.center[0]);
   assert.ok(openTarget.zoom > 0);
   assert.ok(closedTarget.zoom > 0);
 });

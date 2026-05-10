@@ -11,8 +11,20 @@ test("getProvinceCameraTarget centers a province using window bounds", () => {
     viewport: { width: 1000, height: 800 },
   });
 
-  assert.deepEqual(target.center, [125, 35]);
+  assert.ok(target.center[0] > 125);
+  assert.equal(target.center[1], 35);
   assert.ok(target.zoom > 4);
+});
+
+test("getProvinceCameraTarget shifts the province toward the left third of the window", () => {
+  const target = getProvinceCameraTarget({
+    provinceId: "330000",
+    bounds: { minLng: 118, maxLng: 123, minLat: 27, maxLat: 31 },
+    visualCenter: [120.15, 29.2],
+    viewport: { width: 1440, height: 900 },
+  });
+
+  assert.ok(target.center[0] > 120.15);
 });
 
 test("getProvinceCameraTarget applies a positive zoom bias for normal provinces", () => {

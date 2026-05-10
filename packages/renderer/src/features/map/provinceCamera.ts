@@ -1,3 +1,5 @@
+import { DRAWER_WIDTH } from "./mapLayout.js";
+
 export interface ProvinceCameraBounds {
   minLng: number;
   maxLng: number;
@@ -33,6 +35,24 @@ const CAMERA_PROFILE_BY_PROVINCE: Record<
   "710000": { zoomBias: 0.04, maxZoom: 9.0 },
 };
 
+export const CAMERA_TARGET_X_RATIO = 0.33;
+
+export function getAnchoredCenterLng(input: {
+  visualCenterLng: number;
+  lngSpan: number;
+  viewportWidth: number;
+  availableWidth: number;
+  anchorXRatio?: number;
+}) {
+  const anchorXRatio = input.anchorXRatio ?? CAMERA_TARGET_X_RATIO;
+  const anchorDeltaRatio = Math.max(0, 0.5 - anchorXRatio);
+  const lngOffset =
+    input.lngSpan *
+    ((input.viewportWidth * anchorDeltaRatio) / Math.max(input.availableWidth, 1));
+
+  return Number((input.visualCenterLng + lngOffset).toFixed(6));
+}
+
 export function getProvinceCameraTarget(input: ProvinceCameraInput) {
   const edgePadding = input.edgePadding ?? 24;
   const minZoom = input.minZoom ?? 4.5;
@@ -40,7 +60,12 @@ export function getProvinceCameraTarget(input: ProvinceCameraInput) {
     ? CAMERA_PROFILE_BY_PROVINCE[input.provinceId] ?? { zoomBias: 0.2 }
     : { zoomBias: 0.2 };
   const maxZoom = profile.maxZoom ?? input.maxZoom ?? 8.8;
-  const availableWidth = Math.max(input.viewport.width - edgePadding * 2, 320);
+  const leftPadding = edgePadding;
+  const rightPadding = DRAWER_WIDTH + edgePadding;
+  const availableWidth = Math.max(
+    input.viewport.width - leftPadding - rightPadding,
+    320,
+  );
   const availableHeight = Math.max(input.viewport.height - edgePadding * 2, 240);
   const lngSpan = Math.max(input.bounds.maxLng - input.bounds.minLng, 0.01);
   const latSpan = Math.max(input.bounds.maxLat - input.bounds.minLat, 0.01);
@@ -53,7 +78,15 @@ export function getProvinceCameraTarget(input: ProvinceCameraInput) {
   );
 
   return {
-    center: input.visualCenter,
+    center: [
+      getAnchoredCenterLng({
+        visualCenterLng: input.visualCenter[0],
+        lngSpan,
+        viewportWidth: input.viewport.width,
+        availableWidth,
+      }),
+      input.visualCenter[1],
+    ] as [number, number],
     zoom: Number(zoom.toFixed(2)),
   };
 }
