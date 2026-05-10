@@ -27,6 +27,7 @@ export function Drawer({ open, onToggle }: DrawerProps) {
   const selectPoi = useMapStore((s) => s.selectPoi);
   const selectedTripId = useMapStore((s) => s.selectedTripId);
   const selectTrip = useMapStore((s) => s.selectTrip);
+  const startAddPoi = useMapStore((s) => s.startAddPoi);
 
   const visible = level !== "country" && open;
   const showShell = level !== "country";
@@ -159,6 +160,7 @@ export function Drawer({ open, onToggle }: DrawerProps) {
                   provinceName={provinceName}
                   onOpenTrips={() => setView("trip-list")}
                   onOpenAssets={() => setView("city-assets")}
+                  onStartAddPoi={startAddPoi}
                 />
               )}
               {view === "city-assets" && (

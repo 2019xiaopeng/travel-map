@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { db } from "../../services/db";
 import { ui } from "../../services/ui";
-import type { CityAsset } from "../../types";
+import type { CityAsset, Trip } from "../../types";
 import { getCityAssetPreviewKind, localPathToLocalUrl } from "./cityAssetsPreview";
+import { groupCityAssets } from "./cityAssetsGroups";
 
 interface CityAssetsProps {
   cityId: string;
@@ -11,10 +12,13 @@ interface CityAssetsProps {
 
 export function CityAssets({ cityId }: CityAssetsProps) {
   const [items, setItems] = useState<CityAsset[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [textPreview, setTextPreview] = useState<string>("");
+  const [assigning, setAssigning] = useState(false);
+  const [targetTripId, setTargetTripId] = useState<string>("");
 
   const loadItems = async () => {
     setLoading(true);
@@ -35,30 +39,32 @@ export function CityAssets({ cityId }: CityAssetsProps) {
     void loadItems();
   }, [cityId]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTrips = async () => {
+      try {
+        const rows = (await db.getTrips(cityId)) as Trip[];
+        if (!cancelled) {
+          setTrips(rows);
+        }
+      } catch (err) {
+        console.error("Failed to load trips for city assets:", err);
+      }
+    };
+
+    void loadTrips();
+    return () => {
+      cancelled = true;
+    };
+  }, [cityId]);
+
   const selected = useMemo(
     () => items.find((item) => item.asset_id === selectedId) ?? null,
     [items, selectedId],
   );
 
-  const groupedItems = useMemo(() => {
-    const groups = new Map<string, { tripTitle: string; items: CityAsset[] }>();
-    for (const item of items) {
-      const group = groups.get(item.trip_id);
-      if (group) {
-        group.items.push(item);
-      } else {
-        groups.set(item.trip_id, {
-          tripTitle: item.trip_title,
-          items: [item],
-        });
-      }
-    }
-    return Array.from(groups.entries()).map(([tripId, group]) => ({
-      tripId,
-      tripTitle: group.tripTitle,
-      items: group.items,
-    }));
-  }, [items]);
+  const groupedItems = useMemo(() => groupCityAssets(items), [items]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +96,33 @@ export function CityAssets({ cityId }: CityAssetsProps) {
     const res = await window.travelMap.file.openLocal(asset.local_path);
     if (res?.error) {
       ui.toast.error(res.error);
+    }
+  };
+
+  useEffect(() => {
+    if (selected?.source_kind === "city_inbox") {
+      setTargetTripId((current) => current || trips[0]?.trip_id || "");
+      return;
+    }
+    setTargetTripId("");
+  }, [selected?.asset_id, selected?.source_kind, trips]);
+
+  const assignSelectedToTrip = async () => {
+    if (!selected || selected.source_kind !== "city_inbox") return;
+    if (!targetTripId) {
+      ui.toast.info("请先创建一条旅行记录");
+      return;
+    }
+    setAssigning(true);
+    try {
+      await db.assignCityAssetToTrip(cityId, selected.asset_id, targetTripId);
+      await loadItems();
+      ui.toast.success("已归入旅行");
+    } catch (err: any) {
+      console.error("Failed to assign city asset to trip:", err);
+      ui.toast.error(err?.message || "归入旅行失败");
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -125,7 +158,31 @@ export function CityAssets({ cityId }: CityAssetsProps) {
   return (
     <div className="flex h-full min-h-0 animate-fade-in-up">
       <div className="w-[240px] shrink-0 overflow-y-auto border-r border-[var(--color-border)] bg-[var(--color-surface-elevated)]/20">
-        {groupedItems.map((group) => (
+        {groupedItems.unclassified.length > 0 && (
+          <section className="border-b border-[var(--color-border)]/60">
+            <div className="px-4 py-3 text-[11px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+              未归类资料
+            </div>
+            {groupedItems.unclassified.map((item) => {
+              const active = item.asset_id === selectedId;
+              const previewKind = getCityAssetPreviewKind(item);
+              return (
+                <button
+                  key={item.asset_id}
+                  onClick={() => setSelectedId(item.asset_id)}
+                  className={`flex w-full flex-col gap-1 px-4 py-3 text-left transition-colors ${
+                    active ? "bg-white/8" : "hover:bg-white/5"
+                  }`}
+                >
+                  <span className="truncate text-sm text-white">{item.original_filename}</span>
+                  <span className="text-[11px] text-neutral-500">城市资料 · {previewKind}</span>
+                </button>
+              );
+            })}
+          </section>
+        )}
+
+        {groupedItems.tripGroups.map((group) => (
           <section key={group.tripId} className="border-b border-[var(--color-border)]/60">
             <div className="px-4 py-3 text-[11px] font-medium uppercase tracking-[0.16em] text-neutral-500">
               {group.tripTitle}
@@ -159,16 +216,51 @@ export function CityAssets({ cityId }: CityAssetsProps) {
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-semibold text-white">{selected.original_filename}</h3>
                 <p className="mt-1 text-xs text-neutral-500">
-                  {selected.trip_title} · {selected.source_kind === "attachment" ? "附件" : "正文图片"}
+                  {selected.source_kind === "city_inbox"
+                    ? "未归类资料"
+                    : `${selected.trip_title} · ${selected.source_kind === "attachment" ? "附件" : "正文图片"}`}
                 </p>
               </div>
-              <button
-                onClick={() => void openSelectedExternally(selected)}
-                className="shrink-0 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs text-white hover:bg-white/5"
-              >
-                用系统打开
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => void openSelectedExternally(selected)}
+                  className="shrink-0 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs text-white hover:bg-white/5"
+                >
+                  用系统打开
+                </button>
+              </div>
             </div>
+
+            {selected.source_kind === "city_inbox" && (
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30 p-3">
+                <span className="text-xs text-neutral-400">归入旅行</span>
+                <select
+                  value={targetTripId}
+                  onChange={(event) => setTargetTripId(event.target.value)}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none"
+                >
+                  {trips.length === 0 ? (
+                    <option value="">请先创建旅行记录</option>
+                  ) : (
+                    <>
+                      <option value="">选择一条旅行</option>
+                      {trips.map((trip) => (
+                        <option key={trip.trip_id} value={trip.trip_id}>
+                          {trip.title}
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+                <button
+                  onClick={() => void assignSelectedToTrip()}
+                  disabled={assigning || !targetTripId}
+                  className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-xs font-medium text-white hover:bg-[var(--color-accent)]/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {assigning ? "归类中..." : "归入旅行"}
+                </button>
+              </div>
+            )}
 
             {getCityAssetPreviewKind(selected) === "image" && (
               <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-[var(--color-border)] bg-black/20 p-3">

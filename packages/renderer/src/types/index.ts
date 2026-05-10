@@ -61,9 +61,9 @@ export interface Asset {
 }
 
 export interface CityAsset extends Asset {
-  trip_id: string;
-  trip_title: string;
-  source_kind: "attachment" | "inline";
+  trip_id: string | null;
+  trip_title: string | null;
+  source_kind: "city_inbox" | "attachment" | "inline";
 }
 
 export interface TripCost {

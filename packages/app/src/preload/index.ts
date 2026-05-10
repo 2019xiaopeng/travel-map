@@ -41,6 +41,8 @@ const api = {
     updateCityCover: (payload: any) => ipcRenderer.invoke("db:updateCityCover", payload),
     updateCityVisitState: (payload: { cityId: string; visitState: "unrecorded" | "wishlist" | "visited" }) =>
       ipcRenderer.invoke("db:updateCityVisitState", payload),
+    assignCityAssetToTrip: (payload: { cityId: string; assetId: string; tripId: string }) =>
+      ipcRenderer.invoke("db:assignCityAssetToTrip", payload),
 
     getTags: (payload: { entityType: string; entityId: string }) => ipcRenderer.invoke("db:getTags", payload),
     addTag: (payload: { entityType: string; entityId: string; name: string }) => ipcRenderer.invoke("db:addTag", payload),
@@ -50,6 +52,8 @@ const api = {
     select: () => ipcRenderer.invoke("file:select"),
     saveAsset: (sourcePath: string, destRelativeDir: string) =>
       ipcRenderer.invoke("file:saveAsset", { sourcePath, destRelativeDir }),
+    saveCityAsset: (payload: { cityId: string; cityName: string; sourcePath: string }) =>
+      ipcRenderer.invoke("file:saveCityAsset", payload),
     saveAssetBytes: (bytes: ArrayBuffer, originalFilename: string, mime: string, destRelativeDir: string) =>
       ipcRenderer.invoke("file:saveAssetBytes", { bytes, originalFilename, mime, destRelativeDir }),
     exportBackupZip: () => ipcRenderer.invoke("file:exportBackupZip"),

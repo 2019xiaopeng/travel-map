@@ -22,6 +22,10 @@ export const db = {
     return await window.travelMap.db.updateCityVisitState({ cityId, visitState });
   },
 
+  async assignCityAssetToTrip(cityId: string, assetId: string, tripId: string) {
+    return await window.travelMap.db.assignCityAssetToTrip({ cityId, assetId, tripId });
+  },
+
   async getTrips(cityId: string) {
     return await window.travelMap.db.getTrips({ cityId });
   },

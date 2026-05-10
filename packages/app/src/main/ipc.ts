@@ -52,7 +52,7 @@ export function setupIpc() {
       SELECT COUNT(*) as cnt
       FROM Tag
       WHERE name = ?
-        AND entity_type IN ('trip_attachment', 'trip_inline_asset')
+        AND entity_type IN ('trip_attachment', 'trip_inline_asset', 'city_asset')
     `).get(assetId) as any;
 
     const tripCoverRefs = db.prepare(`SELECT COUNT(*) as cnt FROM Trip WHERE cover_asset_id = ?`).get(assetId) as any;
@@ -72,6 +72,127 @@ export function setupIpc() {
         console.error(`Failed to delete asset file: ${absolutePath}`, err);
       }
     });
+  };
+
+  const normalizeDestRelativeDir = (destRelativeDir: string) => {
+    const normalizedDestDir = path
+      .normalize(destRelativeDir)
+      .replace(/^(?:\.\.(?:\/|\\|$))+/, "");
+    if (!/^[a-zA-Z0-9/_-]*$/.test(normalizedDestDir)) {
+      throw new Error("Invalid destination directory");
+    }
+    return normalizedDestDir;
+  };
+
+  const guessMimeFromFilename = (filename: string) => {
+    const ext = path.extname(filename).toLowerCase();
+    if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+    if (ext === ".png") return "image/png";
+    if (ext === ".gif") return "image/gif";
+    if (ext === ".webp") return "image/webp";
+    if (ext === ".pdf") return "application/pdf";
+    if (ext === ".md") return "text/markdown";
+    if (ext === ".txt") return "text/plain";
+    return "application/octet-stream";
+  };
+
+  const saveAssetFromPath = async (sourcePath: string, destRelativeDir: string) => {
+    let absoluteDestPath = "";
+    try {
+      const sourceStat = fs.lstatSync(sourcePath);
+      if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+        return { error: "Invalid source file" };
+      }
+
+      const assetId = crypto.randomUUID();
+      const originalFilename = path.basename(sourcePath);
+      const destFilename = `${assetId}__${originalFilename}`;
+      const normalizedDestDir = normalizeDestRelativeDir(destRelativeDir);
+      const userDataPath = app.getPath("userData");
+      const assetsRoot = path.resolve(path.join(userDataPath, "assets"));
+      absoluteDestPath = path.resolve(path.join(assetsRoot, normalizedDestDir, destFilename));
+
+      if (!absoluteDestPath.startsWith(assetsRoot + path.sep)) {
+        return { error: "Invalid destination path" };
+      }
+
+      fs.mkdirSync(path.dirname(absoluteDestPath), { recursive: true });
+      fs.copyFileSync(sourcePath, absoluteDestPath);
+
+      const stats = fs.statSync(absoluteDestPath);
+      const mime = guessMimeFromFilename(originalFilename);
+      const sha256 = await new Promise<string>((resolve, reject) => {
+        const hashSum = crypto.createHash("sha256");
+        const stream = fs.createReadStream(absoluteDestPath);
+        stream.on("error", reject);
+        stream.on("data", (chunk) => hashSum.update(chunk));
+        stream.on("end", () => resolve(hashSum.digest("hex")));
+      });
+
+      const destRelativePath = path
+        .relative(userDataPath, absoluteDestPath)
+        .split(path.sep)
+        .join("/");
+
+      const db = getDb();
+      const now = Date.now();
+      try {
+        db.prepare(`
+          INSERT INTO Asset (asset_id, type, original_filename, mime, size, sha256, local_path, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          assetId,
+          mime.startsWith("image/") ? "image" : "file",
+          originalFilename,
+          mime,
+          stats.size,
+          sha256,
+          destRelativePath,
+          now,
+        );
+      } catch (e: any) {
+        const message = String(e?.message ?? "");
+        if (message.includes("UNIQUE") && message.toLowerCase().includes("sha256")) {
+          const existing = db.prepare(`SELECT asset_id, local_path FROM Asset WHERE sha256 = ?`).get(sha256) as any;
+          if (absoluteDestPath) {
+            try {
+              fs.unlinkSync(absoluteDestPath);
+            } catch (err: any) {
+              if (err?.code !== "ENOENT") {
+                console.error(`Failed to cleanup duplicated asset file: ${absoluteDestPath}`, err);
+              }
+            }
+          }
+          if (existing?.asset_id && existing?.local_path) {
+            const suffix = existing.local_path.startsWith("assets/")
+              ? existing.local_path.slice("assets/".length)
+              : existing.local_path;
+            return { assetId: existing.asset_id, localUrl: `local://assets/${suffix}` };
+          }
+        }
+        throw e;
+      }
+
+      const suffix = destRelativePath.startsWith("assets/")
+        ? destRelativePath.slice("assets/".length)
+        : destRelativePath;
+      return {
+        assetId,
+        localUrl: `local://assets/${suffix}`,
+      };
+    } catch (e: any) {
+      if (absoluteDestPath) {
+        try {
+          fs.unlinkSync(absoluteDestPath);
+        } catch (err: any) {
+          if (err?.code !== "ENOENT") {
+            console.error(`Failed to cleanup asset file: ${absoluteDestPath}`, err);
+          }
+        }
+      }
+      console.error("Failed to save asset:", e);
+      return { error: e.message };
+    }
   };
 
   ipcMain.handle("db:getCity", (event, payload: { cityId: string; provinceId: string; cityName: string; provinceName: string }) => {
@@ -471,6 +592,36 @@ export function setupIpc() {
     return { ok: true };
   });
 
+  ipcMain.handle(
+    "db:assignCityAssetToTrip",
+    (event, payload: { cityId: string; assetId: string; tripId: string }) => {
+      assertSender(event);
+      const db = getDb();
+      const trip = db.prepare(`SELECT city_id FROM Trip WHERE trip_id = ?`).get(payload.tripId) as
+        | { city_id?: string }
+        | undefined;
+
+      if (!trip?.city_id || trip.city_id !== payload.cityId) {
+        throw new Error("Trip does not belong to the selected city");
+      }
+
+      const tx = db.transaction(() => {
+        db.prepare(`DELETE FROM Tag WHERE entity_type = 'city_asset' AND entity_id = ? AND name = ?`).run(
+          payload.cityId,
+          payload.assetId,
+        );
+        db.prepare(`INSERT OR IGNORE INTO Tag (entity_type, entity_id, name) VALUES (?, ?, ?)`).run(
+          "trip_attachment",
+          payload.tripId,
+          payload.assetId,
+        );
+      });
+
+      tx();
+      return { ok: true };
+    },
+  );
+
   ipcMain.handle("file:select", async (event) => {
     assertSender(event);
     const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -483,104 +634,28 @@ export function setupIpc() {
 
   ipcMain.handle("file:saveAsset", async (event, payload: { sourcePath: string; destRelativeDir: string }) => {
     assertSender(event);
-    let absoluteDestPath = "";
-    try {
-      const sourcePath = payload.sourcePath;
-      const destRelativeDir = payload.destRelativeDir;
-
-      const sourceStat = fs.lstatSync(sourcePath);
-      if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
-        return { error: "Invalid source file" };
-      }
-
-      const assetId = crypto.randomUUID();
-      const originalFilename = path.basename(sourcePath);
-      const destFilename = `${assetId}__${originalFilename}`;
-
-      const normalizedDestDir = path.normalize(destRelativeDir).replace(/^(?:\.\.(?:\/|\\|$))+/, "");
-      if (!/^[a-zA-Z0-9/_-]*$/.test(normalizedDestDir)) {
-        return { error: "Invalid destination directory" };
-      }
-
-      const userDataPath = app.getPath("userData");
-      const assetsRoot = path.resolve(path.join(userDataPath, "assets"));
-      absoluteDestPath = path.resolve(path.join(assetsRoot, normalizedDestDir, destFilename));
-
-      if (!absoluteDestPath.startsWith(assetsRoot + path.sep)) {
-        return { error: "Invalid destination path" };
-      }
-
-      fs.mkdirSync(path.dirname(absoluteDestPath), { recursive: true });
-      fs.copyFileSync(sourcePath, absoluteDestPath);
-
-      const stats = fs.statSync(absoluteDestPath);
-      const ext = path.extname(originalFilename).toLowerCase();
-      let mime = "application/octet-stream";
-      if (ext === ".jpg" || ext === ".jpeg") mime = "image/jpeg";
-      else if (ext === ".png") mime = "image/png";
-      else if (ext === ".gif") mime = "image/gif";
-      else if (ext === ".webp") mime = "image/webp";
-
-      const sha256 = await new Promise<string>((resolve, reject) => {
-        const hashSum = crypto.createHash("sha256");
-        const stream = fs.createReadStream(absoluteDestPath);
-        stream.on("error", reject);
-        stream.on("data", (chunk) => hashSum.update(chunk));
-        stream.on("end", () => resolve(hashSum.digest("hex")));
-      });
-
-      const destRelativePath = path
-        .relative(userDataPath, absoluteDestPath)
-        .split(path.sep)
-        .join("/");
-
-      const db = getDb();
-      const now = Date.now();
-      try {
-        db.prepare(`
-          INSERT INTO Asset (asset_id, type, original_filename, mime, size, sha256, local_path, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(assetId, mime.startsWith("image/") ? "image" : "file", originalFilename, mime, stats.size, sha256, destRelativePath, now);
-      } catch (e: any) {
-        const message = String(e?.message ?? "");
-        if (message.includes("UNIQUE") && message.toLowerCase().includes("sha256")) {
-          const existing = db.prepare(`SELECT asset_id, local_path FROM Asset WHERE sha256 = ?`).get(sha256) as any;
-          if (absoluteDestPath) {
-            try {
-              fs.unlinkSync(absoluteDestPath);
-            } catch (err: any) {
-              if (err?.code !== "ENOENT") {
-                console.error(`Failed to cleanup duplicated asset file: ${absoluteDestPath}`, err);
-              }
-            }
-          }
-          if (existing?.asset_id && existing?.local_path) {
-            const suffix = existing.local_path.startsWith("assets/") ? existing.local_path.slice("assets/".length) : existing.local_path;
-            return { assetId: existing.asset_id, localUrl: `local://assets/${suffix}` };
-          }
-        }
-        throw e;
-      }
-
-      const suffix = destRelativePath.startsWith("assets/") ? destRelativePath.slice("assets/".length) : destRelativePath;
-      return {
-        assetId,
-        localUrl: `local://assets/${suffix}`
-      };
-    } catch (e: any) {
-      if (absoluteDestPath) {
-        try {
-          fs.unlinkSync(absoluteDestPath);
-        } catch (err: any) {
-          if (err?.code !== "ENOENT") {
-            console.error(`Failed to cleanup asset file: ${absoluteDestPath}`, err);
-          }
-        }
-      }
-      console.error("Failed to save asset:", e);
-      return { error: e.message };
-    }
+    return await saveAssetFromPath(payload.sourcePath, payload.destRelativeDir);
   });
+
+  ipcMain.handle(
+    "file:saveCityAsset",
+    async (event, payload: { cityId: string; cityName: string; sourcePath: string }) => {
+      assertSender(event);
+      const mime = guessMimeFromFilename(path.basename(payload.sourcePath));
+      const bucket = mime.startsWith("image/") ? "images" : "docs";
+      const destRelativeDir = `cities/${payload.cityId}-${payload.cityName}/inbox/${bucket}`;
+      const result = await saveAssetFromPath(payload.sourcePath, destRelativeDir);
+      if (result.assetId) {
+        const db = getDb();
+        db.prepare(`INSERT OR IGNORE INTO Tag (entity_type, entity_id, name) VALUES (?, ?, ?)`).run(
+          "city_asset",
+          payload.cityId,
+          result.assetId,
+        );
+      }
+      return result;
+    },
+  );
 
   ipcMain.handle(
     "file:saveAssetBytes",
