@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type MouseEvent } from "react";
 import { useMapStore } from "../features/map/mapStore";
 import { getProvinceCityNames } from "../features/map/provinceCityList.ts";
 import { CityHome } from "./drawer/CityHome";
+import { CityAssets } from "./drawer/CityAssets";
 import { ProvinceOverview } from "./drawer/ProvinceOverview";
 import { TripList } from "./drawer/TripList";
 import { TripDetail } from "./drawer/TripDetail";
@@ -161,9 +162,7 @@ export function Drawer({ open, onToggle }: DrawerProps) {
                 />
               )}
               {view === "city-assets" && (
-                <div className="p-5 text-sm text-neutral-400 animate-fade-in-up">
-                  本地资料页下一步接入。
-                </div>
+                <CityAssets cityId={cityId} />
               )}
               {view === "trip-list" && (
                 <TripList
