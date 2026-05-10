@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, type MouseEvent } from "react";
+import { useState, useEffect, useRef, type MouseEvent } from "react";
 import { useMapStore } from "../features/map/mapStore";
 import { getProvinceCityNames } from "../features/map/provinceCityList.ts";
 import { CityHome } from "./drawer/CityHome";
@@ -13,7 +13,7 @@ interface DrawerProps {
   onToggle: () => void;
 }
 
-type DrawerView = "city-home" | "trip-list" | "trip-detail" | "poi-detail";
+type DrawerView = "city-home" | "city-assets" | "trip-list" | "trip-detail" | "poi-detail";
 
 export function Drawer({ open, onToggle }: DrawerProps) {
   const level = useMapStore((s) => s.level);
@@ -125,6 +125,8 @@ export function Drawer({ open, onToggle }: DrawerProps) {
                   } else if (view === "trip-detail") {
                     setView("trip-list");
                     selectTrip(null);
+                  } else if (view === "city-assets") {
+                    setView("city-home");
                   } else {
                     setView("city-home");
                   }
@@ -155,7 +157,13 @@ export function Drawer({ open, onToggle }: DrawerProps) {
                   provinceId={provinceId}
                   provinceName={provinceName}
                   onOpenTrips={() => setView("trip-list")}
+                  onOpenAssets={() => setView("city-assets")}
                 />
+              )}
+              {view === "city-assets" && (
+                <div className="p-5 text-sm text-neutral-400 animate-fade-in-up">
+                  本地资料页下一步接入。
+                </div>
               )}
               {view === "trip-list" && (
                 <TripList

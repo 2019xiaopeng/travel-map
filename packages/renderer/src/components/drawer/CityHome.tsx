@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { db } from "../../services/db";
 import { ui } from "../../services/ui";
 import { City } from "../../types";
 import { formatBackupWarnings, formatBackupWarningsGrouped } from "../../utils/backupWarnings";
+import { deriveCityHomeState } from "./cityHomeState";
 
 interface CityHomeProps {
   cityId: string;
@@ -10,6 +11,7 @@ interface CityHomeProps {
   provinceId: string;
   provinceName: string;
   onOpenTrips: () => void;
+  onOpenAssets: () => void;
 }
 
 export function CityHome({
@@ -18,40 +20,78 @@ export function CityHome({
   provinceId,
   provinceName,
   onOpenTrips,
+  onOpenAssets,
 }: CityHomeProps) {
   const [data, setData] = useState<City | null>(null);
   const [summary, setSummary] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    db.getCity(cityId, provinceId, cityName, provinceName)
-      .then((res) => {
-        if (active) {
-          setData(res);
-          setSummary(res?.summary || "");
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load city:", err);
-      });
-    return () => {
-      active = false;
-    };
+  const loadCity = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await db.getCity(cityId, provinceId, cityName, provinceName);
+      setData(res);
+      setSummary(res?.summary || "");
+    } catch (err) {
+      console.error("Failed to load city:", err);
+      setError("城市资料加载失败");
+    } finally {
+      setLoading(false);
+    }
   }, [cityId, provinceId, cityName, provinceName]);
 
-  if (!data) {
+  useEffect(() => {
+    void loadCity();
+  }, [loadCity]);
+
+  const viewState = deriveCityHomeState({ loading, error, city: data });
+
+  if (viewState === "loading") {
+    return <CityHomeSkeleton />;
+  }
+
+  if (viewState === "error") {
+    return (
+      <div className="p-5 space-y-4 animate-fade-in-up">
+        <h2 className="text-lg font-semibold text-white">{cityName}</h2>
+        <p className="text-sm text-neutral-400">城市资料加载失败，请重试。</p>
+        <button
+          onClick={() => void loadCity()}
+          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent)]/90"
+        >
+          重试
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) return <CityHomeSkeleton />;
+
+  if (viewState === "empty") {
     return (
       <div className="p-5 space-y-5 animate-fade-in-up">
-        <div className="aspect-[16/9] w-full rounded-lg bg-[var(--color-surface-elevated)]/60 animate-pulse" />
-        <div className="space-y-2">
-          <div className="h-5 w-28 rounded bg-[var(--color-surface-elevated)]/60 animate-pulse" />
-          <div className="h-12 w-full rounded bg-[var(--color-surface-elevated)]/40 animate-pulse" />
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="h-16 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30 animate-pulse" />
-          <div className="h-16 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30 animate-pulse" />
-          <div className="h-16 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30 animate-pulse" />
-        </div>
+        <section className="rounded-2xl border border-white/10 bg-white/4 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
+          <h2 className="text-lg font-semibold text-white">{cityName}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            这个城市还没有本地资料，可先新建旅行，或进入本地资料页查看后续上传的附件与正文图片。
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <button
+              onClick={onOpenTrips}
+              className="rounded-lg bg-[var(--color-accent)] py-2 text-sm font-medium text-white hover:bg-[var(--color-accent)]/90"
+            >
+              查看旅行记录
+            </button>
+            <button
+              onClick={onOpenAssets}
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 py-2 text-sm font-medium text-white hover:bg-[var(--color-surface-elevated)]"
+            >
+              本地资料
+            </button>
+          </div>
+        </section>
       </div>
     );
   }
@@ -74,8 +114,7 @@ export function CityHome({
               const res = await window.travelMap.file.saveAsset(sourcePath, destDir);
               if (!res.assetId) return;
               await db.updateCityCover(cityId, res.assetId);
-              const updatedCity = await db.getCity(cityId, provinceId, cityName, provinceName);
-              setData(updatedCity);
+              await loadCity();
             } catch (err) {
               console.error("上传城市封面失败", err);
               ui.toast.error("上传失败");
@@ -125,6 +164,12 @@ export function CityHome({
             查看旅行记录
           </button>
           <button
+            onClick={onOpenAssets}
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 py-2 text-sm font-medium text-white hover:bg-[var(--color-surface-elevated)]"
+          >
+            本地资料
+          </button>
+          <button
             onClick={async () => {
               try {
                 const res = await window.travelMap.file.exportBackupZip();
@@ -144,7 +189,7 @@ export function CityHome({
                 ui.toast.error("导出失败");
               }
             }}
-            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 py-2 text-sm font-medium text-white hover:bg-[var(--color-surface-elevated)]"
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 py-2 text-sm font-medium text-white hover:bg-[var(--color-surface-elevated)] col-span-2"
           >
             导出备份
           </button>
@@ -220,6 +265,23 @@ function StatCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/50 p-3 text-center">
       <div className="text-base font-semibold text-[var(--color-accent)]">{value}</div>
       <div className="mt-0.5 text-[11px] text-neutral-500">{label}</div>
+    </div>
+  );
+}
+
+function CityHomeSkeleton() {
+  return (
+    <div className="p-5 space-y-5 animate-fade-in-up">
+      <div className="aspect-[16/9] w-full rounded-lg bg-[var(--color-surface-elevated)]/60 animate-pulse" />
+      <div className="space-y-2">
+        <div className="h-5 w-28 rounded bg-[var(--color-surface-elevated)]/60 animate-pulse" />
+        <div className="h-12 w-full rounded bg-[var(--color-surface-elevated)]/40 animate-pulse" />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="h-16 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30 animate-pulse" />
+        <div className="h-16 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30 animate-pulse" />
+        <div className="h-16 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30 animate-pulse" />
+      </div>
     </div>
   );
 }
