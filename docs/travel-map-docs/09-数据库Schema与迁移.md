@@ -14,6 +14,7 @@
 - `city_id` (TEXT, PK)：如 `330100`
 - `province_id` (TEXT, FK → Province.province_id)
 - `name` (TEXT, NOT NULL)：如 `杭州市`
+- `visit_state` (TEXT)：`unrecorded | wishlist | visited`，用于城市工作台状态表达
 - `summary` (TEXT)：城市简介（可选）
 - `cover_asset_id` (TEXT, FK → Asset.asset_id)：城市封面（可选）
 
@@ -68,10 +69,14 @@
 - 约束：联合主键/唯一约束 `(trip_id, poi_id)`
 
 #### Tag（标签系统）
-- `entity_type` (TEXT)：`city` / `trip` / `poi`
+- `entity_type` (TEXT)：`city` / `trip` / `poi` / `city_asset`
 - `entity_id` (TEXT)
 - `name` (TEXT)
 - 索引：`(entity_type, entity_id)`
+
+说明：
+- `city_asset` 可作为城市级未归类资料的轻量归属方式候选
+- 是否最终采用 `Tag` 扩展还是新增独立关联表，放到实现计划阶段确定
 
 #### CostBreakdown（花销拆分）
 - `trip_id` (TEXT, FK → Trip.trip_id)
