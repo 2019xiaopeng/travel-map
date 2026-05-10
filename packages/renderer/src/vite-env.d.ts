@@ -8,6 +8,7 @@ interface Window {
     };
     db: {
       getCity: (payload: { cityId: string; provinceId: string; cityName: string; provinceName: string }) => Promise<any>;
+      getCityAssets: (payload: { cityId: string }) => Promise<any>;
       getTrips: (payload: { cityId: string }) => Promise<any>;
       getTrip: (payload: { tripId: string }) => Promise<any>;
       createTrip: (payload: any) => Promise<string>;

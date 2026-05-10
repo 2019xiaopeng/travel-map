@@ -9,6 +9,7 @@ import { createBackupZip } from "./backupZip";
 import { stageRestoreFromZip } from "./backupRestore";
 import { exportRestoreDiagnostic } from "./diagnostics/restoreDiagnostics.ts";
 import { resolveDiagnosticsRevealAbsolutePath } from "./diagnostics/diagnosticsPaths.ts";
+import { getCityAssets } from "./cityAssetsQuery";
 
 export function setupIpc() {
   const assertSender = (event: Electron.IpcMainInvokeEvent) => {
@@ -110,6 +111,12 @@ export function setupIpc() {
       WHERE Trip.city_id = ?
       ORDER BY Trip.date_start DESC
     `).all(payload.cityId);
+  });
+
+  ipcMain.handle("db:getCityAssets", (event, payload: { cityId: string }) => {
+    assertSender(event);
+    const db = getDb();
+    return getCityAssets(db, payload.cityId);
   });
 
   ipcMain.handle("db:createTrip", (event, payload: any) => {

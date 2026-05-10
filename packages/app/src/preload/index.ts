@@ -9,6 +9,7 @@ const api = {
   db: {
     getCity: (payload: { cityId: string; provinceId: string; cityName: string; provinceName: string }) =>
       ipcRenderer.invoke("db:getCity", payload),
+    getCityAssets: (payload: { cityId: string }) => ipcRenderer.invoke("db:getCityAssets", payload),
     getTrips: (payload: { cityId: string }) => ipcRenderer.invoke("db:getTrips", payload),
     getTrip: (payload: { tripId: string }) => ipcRenderer.invoke("db:getTrip", payload),
     createTrip: (payload: { city_id: string; title?: string; date_start?: string; date_end?: string; companions?: string; route?: string; cost_total?: number; cover_asset_id?: string | null; content?: string }) =>

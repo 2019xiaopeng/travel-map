@@ -3,6 +3,10 @@ export const db = {
     return await window.travelMap.db.getCity({ cityId, provinceId, cityName, provinceName });
   },
 
+  async getCityAssets(cityId: string) {
+    return await window.travelMap.db.getCityAssets({ cityId });
+  },
+
   async updateCitySummary(cityId: string, summary: string) {
     return await window.travelMap.db.updateCitySummary({ cityId, summary });
   },

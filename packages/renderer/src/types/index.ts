@@ -59,6 +59,12 @@ export interface Asset {
   created_at: number;
 }
 
+export interface CityAsset extends Asset {
+  trip_id: string;
+  trip_title: string;
+  source_kind: "attachment" | "inline";
+}
+
 export interface TripCost {
   trip_id: string;
   category: string;
