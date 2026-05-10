@@ -29,7 +29,7 @@ export function BreadCrumbOverlay({
           : "单击右侧把手展开或收起侧栏";
 
   return (
-    <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 text-xs">
+    <div className="absolute top-4 left-4 z-10 text-xs">
       <div className="flex items-center gap-2">
         <div
           className="
@@ -118,7 +118,7 @@ export function BreadCrumbOverlay({
         />
       </div>
 
-      <div className="rounded-lg border border-white/8 bg-black/45 px-3 py-2 text-[11px] text-neutral-200 backdrop-blur-md">
+      <div className="mt-2 inline-flex max-w-xs rounded-lg border border-white/8 bg-black/45 px-3 py-2 text-[11px] text-neutral-200 backdrop-blur-md">
         {instruction}
       </div>
     </div>

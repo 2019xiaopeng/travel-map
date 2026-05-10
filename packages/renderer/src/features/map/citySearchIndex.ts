@@ -9,8 +9,15 @@ export interface CitySearchEntry {
   geometry?: GeoFeature["geometry"];
 }
 
+export interface SearchMatchPart {
+  text: string;
+  matched: boolean;
+}
+
 type SearchableCityEntry = CitySearchEntry & {
   searchableText: string;
+  cityNameLower: string;
+  provinceNameLower: string;
 };
 
 interface RawProvinceBoundaryFeature {
@@ -75,14 +82,57 @@ export function buildCitySearchIndex(entries: CitySearchEntry[]) {
   return dedupeEntries(entries).map((entry) => ({
     ...entry,
     searchableText: `${entry.cityName} ${entry.provinceName}`.toLowerCase(),
+    cityNameLower: entry.cityName.toLowerCase(),
+    provinceNameLower: entry.provinceName.toLowerCase(),
   }));
+}
+
+function getMatchRank(entry: SearchableCityEntry, normalized: string) {
+  if (entry.cityNameLower.startsWith(normalized)) return 0;
+  if (entry.provinceNameLower.startsWith(normalized)) return 1;
+  if (entry.cityNameLower.includes(normalized)) return 2;
+  if (entry.provinceNameLower.includes(normalized)) return 3;
+  if (entry.searchableText.includes(normalized)) return 4;
+
+  return Number.POSITIVE_INFINITY;
 }
 
 export function searchCityIndex(index: SearchableCityEntry[], query: string) {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return [];
 
-  return index.filter((entry) => entry.searchableText.includes(normalized)).slice(0, 8);
+  return index
+    .map((entry, originalIndex) => ({
+      entry,
+      originalIndex,
+      rank: getMatchRank(entry, normalized),
+    }))
+    .filter((item) => Number.isFinite(item.rank))
+    .sort((left, right) => {
+      if (left.rank !== right.rank) {
+        return left.rank - right.rank;
+      }
+
+      return left.originalIndex - right.originalIndex;
+    })
+    .map((item) => item.entry)
+    .slice(0, 8);
+}
+
+export function getSearchMatchParts(text: string, query: string): SearchMatchPart[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [{ text, matched: false }];
+
+  const lower = text.toLowerCase();
+  const start = lower.indexOf(normalized);
+  if (start < 0) return [{ text, matched: false }];
+
+  const end = start + normalized.length;
+  return [
+    ...(start > 0 ? [{ text: text.slice(0, start), matched: false }] : []),
+    { text: text.slice(start, end), matched: true },
+    ...(end < text.length ? [{ text: text.slice(end), matched: false }] : []),
+  ];
 }
 
 let cityIndexPromise: Promise<SearchableCityEntry[]> | null = null;

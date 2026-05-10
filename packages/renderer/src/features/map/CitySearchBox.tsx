@@ -1,10 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  getSearchMatchParts,
   loadCitySearchIndex,
   searchCityIndex,
   type CitySearchEntry,
 } from "./citySearchIndex.ts";
+
+function HighlightText({
+  text,
+  query,
+}: {
+  text: string;
+  query: string;
+}) {
+  return (
+    <>
+      {getSearchMatchParts(text, query).map((part, index) => (
+        <span
+          key={`${part.text}-${index}`}
+          className={part.matched ? "font-medium text-white" : undefined}
+        >
+          {part.text}
+        </span>
+      ))}
+    </>
+  );
+}
 
 export function CitySearchBox({
   open,
@@ -99,8 +121,12 @@ export function CitySearchBox({
                       : "text-neutral-200 hover:bg-white/5"
                   }`}
                 >
-                  <span>{item.cityName}</span>
-                  <span className="text-xs text-neutral-400">{item.provinceName}</span>
+                  <span>
+                    <HighlightText text={item.cityName} query={query} />
+                  </span>
+                  <span className="text-xs text-neutral-400">
+                    <HighlightText text={item.provinceName} query={query} />
+                  </span>
                 </button>
               ))
             ) : (
