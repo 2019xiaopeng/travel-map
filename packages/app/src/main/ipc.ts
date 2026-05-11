@@ -1,5 +1,5 @@
 import { ipcMain, dialog, shell } from "electron";
-import { getDb } from "./db";
+import { getDb } from "./db/index.ts";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -11,6 +11,11 @@ import { exportRestoreDiagnostic } from "./diagnostics/restoreDiagnostics.ts";
 import { resolveDiagnosticsRevealAbsolutePath } from "./diagnostics/diagnosticsPaths.ts";
 import { getCityAssets } from "./cityAssetsQuery";
 import { readLocalText } from "./readLocalText";
+import {
+  ensureCityExists,
+  updateCityVisitStateRecord,
+  createTripRecord,
+} from "./cityEnsure.ts";
 
 export function setupIpc() {
   const assertSender = (event: Electron.IpcMainInvokeEvent) => {
@@ -198,12 +203,12 @@ export function setupIpc() {
   ipcMain.handle("db:getCity", (event, payload: { cityId: string; provinceId: string; cityName: string; provinceName: string }) => {
     assertSender(event);
     const db = getDb();
-    db.prepare(
-      `INSERT INTO Province (province_id, name) VALUES (?, ?) ON CONFLICT(province_id) DO UPDATE SET name=excluded.name`,
-    ).run(payload.provinceId, payload.provinceName);
-    db.prepare(
-      `INSERT INTO City (city_id, province_id, name) VALUES (?, ?, ?) ON CONFLICT(city_id) DO UPDATE SET name=excluded.name`,
-    ).run(payload.cityId, payload.provinceId, payload.cityName);
+    ensureCityExists(db, {
+      provinceId: payload.provinceId,
+      provinceName: payload.provinceName,
+      cityId: payload.cityId,
+      cityName: payload.cityName,
+    });
 
     const city = db.prepare(`
       SELECT City.*, Asset.local_path as cover_path, Asset.remote_url as cover_remote
@@ -244,6 +249,14 @@ export function setupIpc() {
   ipcMain.handle("db:createTrip", (event, payload: any) => {
     assertSender(event);
     const db = getDb();
+    if (
+      payload?.provinceId &&
+      payload?.provinceName &&
+      payload?.cityId &&
+      payload?.cityName
+    ) {
+      return createTripRecord(db, payload);
+    }
     const tripId = crypto.randomUUID();
     const now = Date.now();
     db.prepare(`
@@ -251,7 +264,7 @@ export function setupIpc() {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       tripId,
-      payload.city_id,
+      payload.city_id ?? payload.cityId,
       payload.title || "新旅行",
       payload.date_start || "",
       payload.date_end || "",
@@ -440,9 +453,25 @@ export function setupIpc() {
 
   ipcMain.handle(
     "db:updateCityVisitState",
-    (event, payload: { cityId: string; visitState: "unrecorded" | "wishlist" | "visited" }) => {
+    (event, payload: {
+      cityId: string;
+      visitState: "unrecorded" | "wishlist" | "visited";
+      // Optional identity for first-touch writes (avoid implicit dependency on db:getCity).
+      provinceId?: string;
+      provinceName?: string;
+      cityName?: string;
+    }) => {
       assertSender(event);
       const db = getDb();
+      if (payload.provinceId && payload.provinceName && payload.cityName) {
+        return updateCityVisitStateRecord(db, {
+          provinceId: payload.provinceId,
+          provinceName: payload.provinceName,
+          cityId: payload.cityId,
+          cityName: payload.cityName,
+          visitState: payload.visitState,
+        });
+      }
       db.prepare(`UPDATE City SET visit_state = ? WHERE city_id = ?`).run(
         payload.visitState,
         payload.cityId,
@@ -632,6 +661,24 @@ export function setupIpc() {
     return filePaths[0];
   });
 
+  ipcMain.handle("file:selectMultiple", async (_event, payload: { mode: "images" | "documents" | "all" }) => {
+    assertSender(_event);
+    const filters = payload.mode === "images"
+      ? [{ name: "图片", extensions: ["jpg", "jpeg", "png", "gif", "webp", "bmp"] }]
+      : payload.mode === "documents"
+        ? [{ name: "文档", extensions: ["pdf", "md", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx"] }]
+        : [
+            { name: "图片", extensions: ["jpg", "jpeg", "png", "gif", "webp", "bmp"] },
+            { name: "文档", extensions: ["pdf", "md", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx"] },
+          ];
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ["openFile", "multiSelections"],
+      filters,
+    });
+    if (canceled || filePaths.length === 0) return { canceled: true, filePaths: [] };
+    return { canceled: false, filePaths };
+  });
+
   ipcMain.handle("file:saveAsset", async (event, payload: { sourcePath: string; destRelativeDir: string }) => {
     assertSender(event);
     return await saveAssetFromPath(payload.sourcePath, payload.destRelativeDir);
@@ -639,8 +686,23 @@ export function setupIpc() {
 
   ipcMain.handle(
     "file:saveCityAsset",
-    async (event, payload: { cityId: string; cityName: string; sourcePath: string }) => {
+    async (event, payload: {
+      cityId: string;
+      cityName: string;
+      sourcePath: string;
+      // Optional identity for first-touch imports (avoid implicit dependency on db:getCity).
+      provinceId?: string;
+      provinceName?: string;
+    }) => {
       assertSender(event);
+      if (payload.provinceId && payload.provinceName) {
+        ensureCityExists(getDb(), {
+          provinceId: payload.provinceId,
+          provinceName: payload.provinceName,
+          cityId: payload.cityId,
+          cityName: payload.cityName,
+        });
+      }
       const mime = guessMimeFromFilename(path.basename(payload.sourcePath));
       const bucket = mime.startsWith("image/") ? "images" : "docs";
       const destRelativeDir = `cities/${payload.cityId}-${payload.cityName}/inbox/${bucket}`;

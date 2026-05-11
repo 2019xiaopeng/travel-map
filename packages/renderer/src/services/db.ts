@@ -18,8 +18,19 @@ export const db = {
   async updateCityVisitState(
     cityId: string,
     visitState: "unrecorded" | "wishlist" | "visited",
+    identity?: {
+      provinceId: string;
+      provinceName: string;
+      cityName: string;
+    },
   ) {
-    return await window.travelMap.db.updateCityVisitState({ cityId, visitState });
+    return await window.travelMap.db.updateCityVisitState({
+      cityId,
+      visitState,
+      provinceId: identity?.provinceId,
+      provinceName: identity?.provinceName,
+      cityName: identity?.cityName,
+    });
   },
 
   async assignCityAssetToTrip(cityId: string, assetId: string, tripId: string) {

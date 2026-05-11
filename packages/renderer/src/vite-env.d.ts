@@ -11,7 +11,7 @@ interface Window {
       getCityAssets: (payload: { cityId: string }) => Promise<any>;
       getTrips: (payload: { cityId: string }) => Promise<any>;
       getTrip: (payload: { tripId: string }) => Promise<any>;
-      createTrip: (payload: any) => Promise<string>;
+      createTrip: (payload: { city_id: string; title?: string; date_start?: string; date_end?: string; companions?: string; route?: string; cost_total?: number; cover_asset_id?: string | null; content?: string; provinceId?: string; provinceName?: string; cityName?: string }) => Promise<string>;
       updateTrip: (payload: any) => Promise<any>;
       deleteTrip: (payload: { tripId: string }) => Promise<any>;
 
@@ -34,7 +34,13 @@ interface Window {
       setTripInlineAssets: (payload: { tripId: string; assetIds: string[] }) => Promise<any>;
       updateCitySummary: (payload: { cityId: string; summary: string }) => Promise<void>;
       updateCityCover: (payload: { cityId: string; assetId: string }) => Promise<void>;
-      updateCityVisitState: (payload: { cityId: string; visitState: "unrecorded" | "wishlist" | "visited" }) => Promise<{ ok: true }>;
+      updateCityVisitState: (payload: {
+        cityId: string;
+        visitState: "unrecorded" | "wishlist" | "visited";
+        provinceId?: string;
+        provinceName?: string;
+        cityName?: string;
+      }) => Promise<{ ok: true }>;
       assignCityAssetToTrip: (payload: { cityId: string; assetId: string; tripId: string }) => Promise<{ ok: true }>;
       getTags: (payload: { entityType: string; entityId: string }) => Promise<Array<{ name: string }>>;
       addTag: (payload: { entityType: string; entityId: string; name: string }) => Promise<any>;
@@ -42,8 +48,9 @@ interface Window {
     };
     file: {
       select: () => Promise<string | null>;
+      selectMultiple: (payload: { mode: "images" | "documents" | "all" }) => Promise<{ canceled: boolean; filePaths: string[] }>;
       saveAsset: (sourcePath: string, destRelativeDir: string) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
-      saveCityAsset: (payload: { cityId: string; cityName: string; sourcePath: string }) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
+      saveCityAsset: (payload: { cityId: string; cityName: string; sourcePath: string; provinceId?: string; provinceName?: string }) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
       saveAssetBytes: (bytes: ArrayBuffer, originalFilename: string, mime: string, destRelativeDir: string) => Promise<{ assetId?: string; localUrl?: string; error?: string }>;
       exportBackupZip: () => Promise<{ ok?: boolean; path?: string; canceled?: boolean; error?: string; warnings?: Array<{ type: string; asset_id?: string; message: string }> }>;
       importBackupZip: () => Promise<{ ok?: boolean; stagingPath?: string; needsRestart?: boolean; canceled?: boolean; error?: string; warnings?: Array<{ type: string; asset_id?: string; message: string }> }>;

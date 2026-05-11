@@ -1,14 +1,19 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { db } from "../../services/db";
+import { ui } from "../../services/ui";
 import { Trip } from "../../types";
 
 interface TripListProps {
   cityId: string;
+  provinceId: string;
+  provinceName: string;
+  cityName: string;
   onSelectTrip: (tripId: string) => void;
 }
 
-export function TripList({ cityId, onSelectTrip }: TripListProps) {
+export function TripList({ cityId, provinceId, provinceName, cityName, onSelectTrip }: TripListProps) {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [creating, setCreating] = useState(false);
 
   const loadTrips = async () => {
     try {
@@ -23,14 +28,24 @@ export function TripList({ cityId, onSelectTrip }: TripListProps) {
     loadTrips();
   }, [cityId]);
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
+    if (creating) return;
+    setCreating(true);
     try {
-      const newTripId = await db.createTrip({ city_id: cityId });
+      const newTripId = await db.createTrip({
+        city_id: cityId,
+        provinceId,
+        provinceName,
+        cityName,
+      });
       onSelectTrip(newTripId);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create trip:", err);
+      ui.toast.error(err?.message || "新建旅行失败");
+    } finally {
+      setCreating(false);
     }
-  };
+  }, [cityId, provinceId, provinceName, cityName, creating, onSelectTrip]);
 
   return (
     <div className="p-5 space-y-3">
@@ -38,9 +53,14 @@ export function TripList({ cityId, onSelectTrip }: TripListProps) {
         <h3 className="text-sm font-medium text-neutral-400">旅行记录</h3>
         <button
           onClick={handleCreate}
-          className="text-xs text-[var(--color-accent)] hover:text-white"
+          disabled={creating}
+          className={`text-xs transition-colors ${
+            creating
+              ? "cursor-not-allowed text-neutral-600"
+              : "text-[var(--color-accent)] hover:text-white"
+          }`}
         >
-          + 新建
+          {creating ? "新建中..." : "+ 新建"}
         </button>
       </div>
 

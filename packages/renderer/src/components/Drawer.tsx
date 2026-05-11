@@ -169,6 +169,9 @@ export function Drawer({ open, onToggle }: DrawerProps) {
               {view === "trip-list" && (
                 <TripList
                   cityId={cityId}
+                  provinceId={provinceId}
+                  provinceName={provinceName}
+                  cityName={cityName}
                   onSelectTrip={(id) => {
                     selectTrip(id);
                     setView("trip-detail");

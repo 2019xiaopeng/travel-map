@@ -31,8 +31,16 @@ export function CityHome({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+
+  const hasApi = typeof window !== "undefined" && Boolean((window as any)?.travelMap?.db);
 
   const loadCity = useCallback(async () => {
+    if (!hasApi) {
+      setRuntimeError("当前运行环境不支持本地数据操作，请使用 Electron 启动应用。");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -41,11 +49,12 @@ export function CityHome({
       setSummary(res?.summary || "");
     } catch (err) {
       console.error("Failed to load city:", err);
-      setError("城市资料加载失败");
+      const message = err instanceof Error ? err.message : "未知错误";
+      setError(`城市资料加载失败：${message}`);
     } finally {
       setLoading(false);
     }
-  }, [cityId, provinceId, cityName, provinceName]);
+  }, [cityId, provinceId, cityName, provinceName, hasApi]);
 
   useEffect(() => {
     void loadCity();
@@ -60,58 +69,80 @@ export function CityHome({
   const updateVisitState = useCallback(
     async (nextState: CityVisitState) => {
       try {
-        await db.updateCityVisitState(cityId, nextState);
+        await db.updateCityVisitState(cityId, nextState, {
+          provinceId,
+          provinceName,
+          cityName,
+        });
         setData((current) => (current ? { ...current, visit_state: nextState } : current));
       } catch (err) {
         console.error("更新城市状态失败", err);
-        ui.toast.error("更新城市状态失败");
+        const message = err instanceof Error ? err.message : "未知错误";
+        ui.toast.error(`更新城市状态失败：${message}`);
       }
     },
-    [cityId],
+    [cityId, provinceId, provinceName, cityName],
   );
 
-  const handleQuickImport = useCallback(() => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.multiple = true;
-    input.onchange = async (event: Event) => {
-      const files = Array.from((event.target as HTMLInputElement).files ?? []);
-      if (files.length === 0) return;
-      setImporting(true);
-      try {
-        let importedCount = 0;
-        for (const file of files) {
-          const sourcePath = (file as File & { path?: string }).path;
-          if (!sourcePath) continue;
-          const result = await window.travelMap.file.saveCityAsset({
-            cityId,
-            cityName,
-            sourcePath,
-          });
-          if (result.assetId) {
-            importedCount += 1;
-          } else if (result.error) {
-            ui.toast.error(result.error);
-          }
-        }
-
-        if (importedCount > 0) {
-          if ((data?.visit_state ?? "unrecorded") === "unrecorded" && Number(data?.tripCount ?? 0) === 0) {
-            await db.updateCityVisitState(cityId, "wishlist");
-          }
-          await loadCity();
-          onOpenAssets();
-          ui.toast.success(`已导入 ${importedCount} 份本地资料`);
-        }
-      } catch (err) {
-        console.error("导入城市资料失败", err);
-        ui.toast.error("导入资料失败");
-      } finally {
-        setImporting(false);
+  const handleQuickImport = useCallback(async () => {
+    setImporting(true);
+    try {
+      const selection = await window.travelMap.file.selectMultiple({ mode: "all" });
+      if (selection.canceled || selection.filePaths.length === 0) {
+        return;
       }
-    };
-    input.click();
-  }, [cityId, cityName, data?.tripCount, data?.visit_state, loadCity, onOpenAssets]);
+
+      let importedCount = 0;
+      let failedCount = 0;
+      let failedMessage = "";
+
+      for (const sourcePath of selection.filePaths) {
+        const result = await window.travelMap.file.saveCityAsset({
+          cityId,
+          cityName,
+          sourcePath,
+          provinceId,
+          provinceName,
+        });
+        if (result.assetId) {
+          importedCount += 1;
+        } else if (result.error) {
+          failedCount += 1;
+          failedMessage = result.error;
+        }
+      }
+
+      if (importedCount === 0) {
+        if (failedCount > 0) {
+          ui.toast.error(`导入失败：${failedMessage}`);
+        } else {
+          ui.toast.error("未获取到可导入文件路径");
+        }
+        return;
+      }
+
+      if ((data?.visit_state ?? "unrecorded") === "unrecorded" && Number(data?.tripCount ?? 0) === 0) {
+        await db.updateCityVisitState(cityId, "wishlist", {
+          provinceId,
+          provinceName,
+          cityName,
+        });
+      }
+      await loadCity();
+      onOpenAssets();
+
+      if (failedCount > 0) {
+        ui.toast.success(`已导入 ${importedCount} 份资料，${failedCount} 个文件失败`, { durationMs: 4000 });
+      } else {
+        ui.toast.success(`已导入 ${importedCount} 份本地资料`);
+      }
+    } catch (err) {
+      console.error("导入城市资料失败", err);
+      ui.toast.error("导入资料失败");
+    } finally {
+      setImporting(false);
+    }
+  }, [cityId, cityName, provinceId, provinceName, data?.tripCount, data?.visit_state, loadCity, onOpenAssets]);
 
   const renderWorkbenchActions = () => (
     <section className="rounded-2xl border border-white/10 bg-white/4 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
@@ -165,6 +196,17 @@ export function CityHome({
     </section>
   );
 
+  if (runtimeError) {
+    return (
+      <div className="p-5 space-y-5 animate-fade-in-up">
+        {renderWorkbenchActions()}
+        <section className="rounded-2xl border border-amber-400/20 bg-amber-500/8 p-4">
+          <p className="text-sm text-amber-200">{runtimeError}</p>
+        </section>
+      </div>
+    );
+  }
+
   if (viewState === "loading") {
     return <CityHomeSkeleton />;
   }
@@ -174,7 +216,7 @@ export function CityHome({
       <div className="p-5 space-y-5 animate-fade-in-up">
         {renderWorkbenchActions()}
         <section className="rounded-2xl border border-red-400/20 bg-red-500/8 p-4">
-          <p className="text-sm text-red-200">城市资料加载失败，请重试。</p>
+          <p className="text-sm text-red-200">{error}</p>
           <button
             onClick={() => void loadCity()}
             className="mt-3 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent)]/90"
@@ -207,26 +249,22 @@ export function CityHome({
 
         <div
           className="mt-4 aspect-[16/9] w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] flex items-center justify-center text-neutral-600 text-xs overflow-hidden cursor-pointer group relative"
-          onClick={() => {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.accept = "image/*";
-            input.onchange = async (e: Event) => {
-              const file = (e.target as HTMLInputElement).files?.[0] as (File & { path?: string }) | undefined;
-              const sourcePath = file?.path;
-              if (!sourcePath) return;
-              const destDir = `cities/${cityId}-${cityName}/city-cover`;
-              try {
-                const res = await window.travelMap.file.saveAsset(sourcePath, destDir);
-                if (!res.assetId) return;
-                await db.updateCityCover(cityId, res.assetId);
-                await loadCity();
-              } catch (err) {
-                console.error("上传城市封面失败", err);
-                ui.toast.error("上传失败");
+          onClick={async () => {
+            const selected = await window.travelMap.file.select();
+            if (!selected) return;
+            const destDir = `cities/${cityId}-${cityName}/city-cover`;
+            try {
+              const res = await window.travelMap.file.saveAsset(selected, destDir);
+              if (!res.assetId) {
+                ui.toast.error(res.error || "上传封面失败");
+                return;
               }
-            };
-            input.click();
+              await db.updateCityCover(cityId, res.assetId);
+              await loadCity();
+            } catch (err) {
+              console.error("上传城市封面失败", err);
+              ui.toast.error("上传失败");
+            }
           }}
         >
           {data.cover_path || data.cover_remote ? (

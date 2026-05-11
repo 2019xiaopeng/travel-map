@@ -1,9 +1,9 @@
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { join } from 'path';
-import { SCHEMA_V1 } from './schema';
+import { SCHEMA_V1 } from './schema.ts';
 import fs from 'fs';
-import { ensureCityVisitStateColumn } from './cityVisitStateMigration';
+import { ensureCityVisitStateColumn } from './cityVisitStateMigration.ts';
 
 export class DBManager {
   private db: Database.Database;

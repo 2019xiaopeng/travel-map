@@ -12,7 +12,7 @@ const api = {
     getCityAssets: (payload: { cityId: string }) => ipcRenderer.invoke("db:getCityAssets", payload),
     getTrips: (payload: { cityId: string }) => ipcRenderer.invoke("db:getTrips", payload),
     getTrip: (payload: { tripId: string }) => ipcRenderer.invoke("db:getTrip", payload),
-    createTrip: (payload: { city_id: string; title?: string; date_start?: string; date_end?: string; companions?: string; route?: string; cost_total?: number; cover_asset_id?: string | null; content?: string }) =>
+    createTrip: (payload: { city_id: string; title?: string; date_start?: string; date_end?: string; companions?: string; route?: string; cost_total?: number; cover_asset_id?: string | null; content?: string; provinceId?: string; provinceName?: string; cityName?: string }) =>
       ipcRenderer.invoke("db:createTrip", payload),
     updateTrip: (payload: any) => ipcRenderer.invoke("db:updateTrip", payload),
     deleteTrip: (payload: { tripId: string }) => ipcRenderer.invoke("db:deleteTrip", payload),
@@ -39,7 +39,13 @@ const api = {
     setTripInlineAssets: (payload: { tripId: string; assetIds: string[] }) => ipcRenderer.invoke("db:setTripInlineAssets", payload),
     updateCitySummary: (payload: any) => ipcRenderer.invoke("db:updateCitySummary", payload),
     updateCityCover: (payload: any) => ipcRenderer.invoke("db:updateCityCover", payload),
-    updateCityVisitState: (payload: { cityId: string; visitState: "unrecorded" | "wishlist" | "visited" }) =>
+    updateCityVisitState: (payload: {
+      cityId: string;
+      visitState: "unrecorded" | "wishlist" | "visited";
+      provinceId?: string;
+      provinceName?: string;
+      cityName?: string;
+    }) =>
       ipcRenderer.invoke("db:updateCityVisitState", payload),
     assignCityAssetToTrip: (payload: { cityId: string; assetId: string; tripId: string }) =>
       ipcRenderer.invoke("db:assignCityAssetToTrip", payload),
@@ -50,6 +56,7 @@ const api = {
   },
   file: {
     select: () => ipcRenderer.invoke("file:select"),
+    selectMultiple: (payload: { mode: "images" | "documents" | "all" }) => ipcRenderer.invoke("file:selectMultiple", payload),
     saveAsset: (sourcePath: string, destRelativeDir: string) =>
       ipcRenderer.invoke("file:saveAsset", { sourcePath, destRelativeDir }),
     saveCityAsset: (payload: { cityId: string; cityName: string; sourcePath: string }) =>

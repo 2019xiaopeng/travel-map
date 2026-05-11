@@ -29,7 +29,8 @@ export function CityAssets({ cityId }: CityAssetsProps) {
       setSelectedId((current) => current && rows.some((row) => row.asset_id === current) ? current : (rows[0]?.asset_id ?? null));
     } catch (err) {
       console.error("Failed to load city assets:", err);
-      setError("本地资料加载失败，请重试。");
+      const message = err instanceof Error ? err.message : "未知错误";
+      setError(`本地资料加载失败：${message}`);
     } finally {
       setLoading(false);
     }
