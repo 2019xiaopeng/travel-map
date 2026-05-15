@@ -1,18 +1,28 @@
+function requireApi() {
+  const api = (typeof window !== "undefined" ? (window as any)?.travelMap : undefined) as
+    | { db: Record<string, (...args: any[]) => Promise<any>> }
+    | undefined;
+  if (!api?.db) {
+    throw new Error("Electron IPC 桥未就绪，请使用 `pnpm dev:electron` 或 `pnpm run dev:electron:local` 启动应用");
+  }
+  return api;
+}
+
 export const db = {
   async getCity(cityId: string, provinceId: string, cityName: string, provinceName: string) {
-    return await window.travelMap.db.getCity({ cityId, provinceId, cityName, provinceName });
+    return await requireApi().db.getCity({ cityId, provinceId, cityName, provinceName });
   },
 
   async getCityAssets(cityId: string) {
-    return await window.travelMap.db.getCityAssets({ cityId });
+    return await requireApi().db.getCityAssets({ cityId });
   },
 
   async updateCitySummary(cityId: string, summary: string) {
-    return await window.travelMap.db.updateCitySummary({ cityId, summary });
+    return await requireApi().db.updateCitySummary({ cityId, summary });
   },
 
   async updateCityCover(cityId: string, assetId: string) {
-    return await window.travelMap.db.updateCityCover({ cityId, assetId });
+    return await requireApi().db.updateCityCover({ cityId, assetId });
   },
 
   async updateCityVisitState(
@@ -24,7 +34,7 @@ export const db = {
       cityName: string;
     },
   ) {
-    return await window.travelMap.db.updateCityVisitState({
+    return await requireApi().db.updateCityVisitState({
       cityId,
       visitState,
       provinceId: identity?.provinceId,
@@ -34,99 +44,99 @@ export const db = {
   },
 
   async assignCityAssetToTrip(cityId: string, assetId: string, tripId: string) {
-    return await window.travelMap.db.assignCityAssetToTrip({ cityId, assetId, tripId });
+    return await requireApi().db.assignCityAssetToTrip({ cityId, assetId, tripId });
   },
 
   async getTrips(cityId: string) {
-    return await window.travelMap.db.getTrips({ cityId });
+    return await requireApi().db.getTrips({ cityId });
   },
 
   async getPois(cityId: string) {
-    return await window.travelMap.db.getPois({ cityId });
+    return await requireApi().db.getPois({ cityId });
   },
 
   async createPoi(poi: any) {
-    return await window.travelMap.db.createPoi(poi);
+    return await requireApi().db.createPoi(poi);
   },
 
   async updatePoi(poi: any) {
-    await window.travelMap.db.updatePoi(poi);
+    await requireApi().db.updatePoi(poi);
   },
 
   async deletePoi(poiId: string) {
-    await window.travelMap.db.deletePoi({ poiId });
+    await requireApi().db.deletePoi({ poiId });
   },
 
   async createTrip(trip: any) {
-    return await window.travelMap.db.createTrip(trip);
+    return await requireApi().db.createTrip(trip);
   },
 
   async updateTrip(trip: any) {
-    await window.travelMap.db.updateTrip(trip);
+    await requireApi().db.updateTrip(trip);
   },
 
   async deleteTrip(tripId: string) {
-    await window.travelMap.db.deleteTrip({ tripId });
+    await requireApi().db.deleteTrip({ tripId });
   },
 
   async getTripCosts(tripId: string) {
-    return await window.travelMap.db.getTripCosts({ tripId });
+    return await requireApi().db.getTripCosts({ tripId });
   },
 
   async updateTripCost(tripId: string, category: string, amount: number) {
-    return await window.travelMap.db.updateTripCost({ tripId, category, amount });
+    return await requireApi().db.updateTripCost({ tripId, category, amount });
   },
 
   async deleteTripCost(tripId: string, category: string) {
-    return await window.travelMap.db.deleteTripCost({ tripId, category });
+    return await requireApi().db.deleteTripCost({ tripId, category });
   },
 
   async getTripAttachments(tripId: string) {
-    return await window.travelMap.db.getTripAttachments({ tripId });
+    return await requireApi().db.getTripAttachments({ tripId });
   },
 
   async removeTripAttachment(tripId: string, assetId: string) {
-    return await window.travelMap.db.removeTripAttachment({ tripId, assetId });
+    return await requireApi().db.removeTripAttachment({ tripId, assetId });
   },
 
   async setTripInlineAssets(tripId: string, assetIds: string[]) {
-    return await window.travelMap.db.setTripInlineAssets({ tripId, assetIds });
+    return await requireApi().db.setTripInlineAssets({ tripId, assetIds });
   },
   
   async getTrip(tripId: string) {
-    return await window.travelMap.db.getTrip({ tripId });
+    return await requireApi().db.getTrip({ tripId });
   },
 
   async addTag(entityType: string, entityId: string, name: string) {
-    await window.travelMap.db.addTag({ entityType, entityId, name });
+    await requireApi().db.addTag({ entityType, entityId, name });
   },
 
   async getPoisForTrip(tripId: string) {
-    return await window.travelMap.db.getPoisForTrip({ tripId });
+    return await requireApi().db.getPoisForTrip({ tripId });
   },
 
   async addPoiToTrip(tripId: string, poiId: string) {
-    return await window.travelMap.db.addPoiToTrip({ tripId, poiId });
+    return await requireApi().db.addPoiToTrip({ tripId, poiId });
   },
 
   async removePoiFromTrip(tripId: string, poiId: string) {
-    return await window.travelMap.db.removePoiFromTrip({ tripId, poiId });
+    return await requireApi().db.removePoiFromTrip({ tripId, poiId });
   },
 
   async getTags(entityType: string, entityId: string) {
-    const res = await window.travelMap.db.getTags({ entityType, entityId });
+    const res = await requireApi().db.getTags({ entityType, entityId });
     return (res ?? []).map((r: any) => r.name);
   },
 
   async removeTag(entityType: string, entityId: string, name: string) {
-    await window.travelMap.db.removeTag({ entityType, entityId, name });
+    await requireApi().db.removeTag({ entityType, entityId, name });
   },
 
   async getPoi(poiId: string) {
-    return await window.travelMap.db.getPoi({ poiId });
+    return await requireApi().db.getPoi({ poiId });
   },
 
   async getTripsForPoi(poiId: string) {
-    return await window.travelMap.db.getTripsForPoi({ poiId });
+    return await requireApi().db.getTripsForPoi({ poiId });
   }
 };
