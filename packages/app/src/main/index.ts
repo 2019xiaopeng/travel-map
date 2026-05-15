@@ -34,6 +34,20 @@ function createWindow() {
     mainWindow!.show();
   });
 
+  mainWindow.webContents.on("preload-error", (_event, _preloadPath, error) => {
+    console.error("Preload script failed to load:", error);
+  });
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    mainWindow!.webContents.executeJavaScript('typeof window.travelMap')
+      .then((result: any) => {
+        if (result !== "object") {
+          console.error("window.travelMap is not available after page load:", result);
+        }
+      })
+      .catch((err: any) => console.error("Failed to check window.travelMap:", err));
+  });
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     try {
       const url = new URL(details.url);

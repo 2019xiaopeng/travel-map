@@ -1,8 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { is } from "@electron-toolkit/utils";
 
 const api = {
-  isDev: is.dev,
+  isDev: !ipcRenderer.invoke ? false : true,
   app: {
     relaunch: () => ipcRenderer.invoke("app:relaunch"),
   },
